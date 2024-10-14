@@ -11,6 +11,11 @@ __pycache__/
 
 data/*
 
-notebooks/*
 
 .DS_Store
+
+notebooks/**/*.parquet
+notebooks/**/*.txt
+
+Undirected_Farcaster/
+Undirected_Facebook/
