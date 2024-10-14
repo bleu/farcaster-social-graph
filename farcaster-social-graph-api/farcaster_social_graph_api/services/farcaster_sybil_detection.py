@@ -57,7 +57,7 @@ class SybilScar:
 
     ## Write final posterior probabilities of nodes to the output file
     ## The final posterior probability is changed from p (in the residual form) to p + 0.5.
-    def write_posterior(self, post_file):
+    def get_posterior(self, post_file):
         # with open(post_file, 'w') as f:
         #     for i in range(self.N):
         #         f.write(f"{i} {self.post[i] + 0.5:.10f}\n")
@@ -66,7 +66,7 @@ class SybilScar:
             {"fid_index": i, "posterior": self.post[i] + 0.5} for i in range(self.N)
         ]
         df_lazy = pl.LazyFrame(data)
-        df_lazy.sink_parquet(post_file)
+        return df_lazy
 
     # Mainloop of SybilSCAR
     def lbp_thread(self, start, end):
@@ -166,9 +166,14 @@ class SybilScarExecutor:
         self.sybil_scar.read_prior(self.sybils, self.benigns)
         self.sybil_scar.lbp()
 
-    def save_results(self, output_file: str):
+    def save_results(self, output_file: str, latest_undirected_links_path: str):
         """Write the SybilScar post results to a file."""
-        self.sybil_scar.write_posterior(output_file)
+        posterior_df = self.sybil_scar.get_posterior(output_file)
+        latest_undirected_links_df = pl.scan_parquet(latest_undirected_links_path).select(
+            ["fid", "fid_index"]
+        ).unique()
+        df_lazy = posterior_df.join(latest_undirected_links_df, on="fid_index")
+        df_lazy.sink_parquet(output_file)
 
     # async def execute(self):
     def execute(self):
@@ -178,7 +183,7 @@ class SybilScarExecutor:
         parquet_path = self.get_latest_parquet_file()
         self.load_data(parquet_path)
         self.run_sybil_scar()
-        self.save_results(self.data_path + "/sybil_scar_results.parquet")
+        self.save_results(self.data_path + "/sybil_scar_results.parquet", latest_undirected_links_path=parquet_path)
         end = time.time()
 
         print(f"SybilScar execution time: {end - start:.2f} seconds")

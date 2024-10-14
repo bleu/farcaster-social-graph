@@ -7,7 +7,7 @@ from farcaster_social_graph_api.services.farcaster_data_transformation import (
     FarcasterLinksAggregator,
     FarcasterUndirectedLinksBuilder,
 )
-from farcaster_social_graph_api.services.sybil_detection import SybilScarExecutor
+from farcaster_social_graph_api.services.farcaster_sybil_detection import SybilScarExecutor
 from farcaster_social_graph_api.config import config
 import polars as pl
 
@@ -44,7 +44,7 @@ async def sync_predictions():
         # farcaster_undirected_links_builder = FarcasterUndirectedLinksBuilder()
         # data = await farcaster_undirected_links_builder.execute()
 
-        # aprox x y
+        # aprox 35 minutes
         # sybil_executor = SybilScarExecutor()
         # sybil_executor.execute()
 
@@ -71,7 +71,7 @@ async def check_sybil(fid: int):
         lazy_df = pl.scan_parquet(result_path)
 
         sybil_df = (
-            lazy_df.filter(pl.col("fid_index") == fid)
+            lazy_df.filter(pl.col("fid") == fid)
             .select("posterior")
             .collect(streaming=True)
         )

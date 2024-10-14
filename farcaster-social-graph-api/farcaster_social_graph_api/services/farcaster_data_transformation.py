@@ -8,6 +8,9 @@ from farcaster_social_graph_api.logger import get_logger
 from farcaster_social_graph_api.config import config
 
 
+logger = get_logger(__name__)
+
+
 class FarcasterBaseProcessor:
     def __init__(self):
         self.data_path = config.DOWNLOAD_DATA_PATH
@@ -39,6 +42,7 @@ class FarcasterBaseProcessor:
 
 class FarcasterLinksAggregator(FarcasterBaseProcessor):
     async def execute(self):
+        logger.info("Aggregating links...")
         start = time.time()
         latest_file = await self.get_latest_parquet_file("farcaster-links-0-*.parquet")
         links_lazy_df = self.get_links_lazy_df(latest_file)
@@ -75,6 +79,7 @@ class FarcasterLinksAggregator(FarcasterBaseProcessor):
 
 class FarcasterUndirectedLinksBuilder(FarcasterBaseProcessor):
     async def execute(self):
+        logger.info("Building undirected links...")
         start = time.time()
         latest_file = await self.get_latest_parquet_file(
             "processed-farcaster-mutual-links-*.parquet"
@@ -140,7 +145,7 @@ class FarcasterUndirectedLinksBuilder(FarcasterBaseProcessor):
 
         return mutual_links_with_index_concatenated.join(
             bot_or_not_df, how="left", on="fid"
-        ).select("fid_index", "target_fid_index", "bot")
+        ).select("fid", "fid_index", "target_fid_index", "bot")
 
 
 # class FarcasterUndirectedLinksToLPBEntries(FarcasterBaseProcessor):
