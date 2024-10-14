@@ -23,7 +23,7 @@ import psutil
 app = FastAPI(title="Optimism Farcaster Social Graph API", version="0.1.0")
 
 honeybadger.configure(
-    api_key="hbp_39AsGmszIgi0JzUNEoDYMH4HdFFjen3hWS1L", enviroment=config.ENVIRONMENT
+    api_key=config.HONEYBADGER_API_KEY, enviroment=config.ENVIRONMENT
 )
 app.add_middleware(contrib.ASGIHoneybadger)
 
