@@ -112,6 +112,21 @@ async def memory_usage():
     return memory_stats
 
 
+@app.get("/cpu-usage")
+async def cpu_usage():
+    cpu_stats = {
+        "cpu_percent": psutil.cpu_percent(
+            interval=1
+        ),  # CPU utilization across all cores
+        "cpu_count": psutil.cpu_count(logical=True),  # Number of logical CPUs
+        "cpu_times": psutil.cpu_times()._asdict(),  # CPU times spent in different states
+        "cpu_per_core": psutil.cpu_percent(
+            interval=1, percpu=True
+        ),  # CPU usage per core
+    }
+    return cpu_stats
+
+
 async def delete_old_files():
     files_patterns = [
         "processed-farcaster-undirected-connections-*.parquet",
