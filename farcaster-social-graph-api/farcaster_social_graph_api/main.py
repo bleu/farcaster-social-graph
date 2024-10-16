@@ -37,8 +37,8 @@ scheduler = AsyncIOScheduler()
 async def startup_event():
     """Schedule the cron jobs and start sync_lbo_data when the app starts."""
     try:
-        asyncio.create_task(sync_lbp_data())
-        asyncio.create_task(delete_old_files())
+        # asyncio.create_task(sync_lbp_data())
+        # asyncio.create_task(delete_old_files())
 
         scheduler.add_job(
             sync_lbp_data,
@@ -84,9 +84,9 @@ async def check_sybil(fid: int):
             return {"fid": fid, "result": "Not Found"}
 
         posterior_value = sybil_df[0, "posterior"]
-        is_sybil = posterior_value > 0.5  # what is the threshold?
+        is_benign = posterior_value > 0.5
 
-        return {"fid": fid, "result": "sybil" if is_sybil else "benign"}
+        return {"fid": fid, "result": "benign" if is_benign else "sybil"}
 
     except Exception as e:
         honeybadger.notify(e)
