@@ -37,8 +37,8 @@ scheduler = AsyncIOScheduler()
 async def startup_event():
     """Schedule the cron jobs and start sync_lbo_data when the app starts."""
     try:
-        # asyncio.create_task(sync_lbp_data())
-        # asyncio.create_task(delete_old_files())
+        asyncio.create_task(sync_lbp_data())
+        asyncio.create_task(delete_old_files())
 
         scheduler.add_job(
             sync_lbp_data,
