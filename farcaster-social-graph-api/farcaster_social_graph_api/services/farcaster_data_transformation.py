@@ -4,11 +4,8 @@ import asyncio
 import aiofiles
 import polars as pl
 import time
-from farcaster_social_graph_api.logger import get_logger
 from farcaster_social_graph_api.config import config
-
-
-logger = get_logger(__name__)
+import logging
 
 
 class FarcasterBaseProcessor:
@@ -42,13 +39,13 @@ class FarcasterBaseProcessor:
 
 class FarcasterLinksAggregator(FarcasterBaseProcessor):
     async def execute(self):
-        logger.info("Aggregating links...")
+        logging.info("Aggregating links...")
         start = time.time()
         latest_file = await self.get_latest_parquet_file("farcaster-links-0-*.parquet")
         links_lazy_df = self.get_links_lazy_df(latest_file)
         mutual_links = self.get_mutual_links(links_lazy_df)
         self.write_links_to_parquet(mutual_links, "processed-farcaster-mutual-links")
-        print(f"Execution time: {time.time() - start} seconds")
+        logging.info(f"Execution time: {time.time() - start} seconds")
         return mutual_links
 
     def get_mutual_links(self, links_df):
@@ -79,7 +76,7 @@ class FarcasterLinksAggregator(FarcasterBaseProcessor):
 
 class FarcasterUndirectedLinksBuilder(FarcasterBaseProcessor):
     async def execute(self):
-        logger.info("Building undirected links...")
+        logging.info("Building undirected links...")
         start = time.time()
         latest_file = await self.get_latest_parquet_file(
             "processed-farcaster-mutual-links-*.parquet"
@@ -89,7 +86,7 @@ class FarcasterUndirectedLinksBuilder(FarcasterBaseProcessor):
         self.write_links_to_parquet(
             undirected_links, "processed-farcaster-undirected-connections"
         )
-        print(f"Execution time: {time.time() - start} seconds")
+        logging.info(f"Execution time: {time.time() - start} seconds")
         return undirected_links
 
     def get_undirected_links(self, links_df):
@@ -154,7 +151,7 @@ class FarcasterUndirectedLinksBuilder(FarcasterBaseProcessor):
 #         latest_file = await self.get_latest_parquet_file("processed-farcaster-undirected-connections-*.parquet")
 #         links_lazy_df = self.get_links_lazy_df(latest_file)
 #         mutual_links = await self.process_links_to_lpb(links_lazy_df)
-#         print(f"Execution time: {time.time() - start} seconds")
+#         logging.info(f"Execution time: {time.time() - start} seconds")
 #         return mutual_links
 
 #     async def process_links_to_lpb(self, links_df):

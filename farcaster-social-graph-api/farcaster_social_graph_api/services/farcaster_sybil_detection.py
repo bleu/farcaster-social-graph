@@ -1,6 +1,5 @@
 import random
 import math
-import threading
 import os
 import glob
 from collections import defaultdict
@@ -10,9 +9,7 @@ import time
 from farcaster_social_graph_api.config import config
 import asyncio
 import numpy as np
-from farcaster_social_graph_api.logger import get_logger
-
-logger = get_logger(__name__)
+import logging
 
 
 class SybilScar:
@@ -27,9 +24,9 @@ class SybilScar:
         self.theta_unl = 0.5
         self.weight = 0.6
         self.max_iter = 10
-        self.num_threads = 8
         self.N = 0
         self.ordering_array = []
+        self.semaphore = asyncio.Semaphore(4)
 
     def add_edge(self, node1, node2, w):
         if node1 != node2:  # Avoid self-loops
@@ -68,18 +65,18 @@ class SybilScar:
         df_lazy = pl.LazyFrame(data)
         return df_lazy
 
-    # Mainloop of SybilSCAR
-    def lbp_thread(self, start, end):
-        for index in range(start, end):
-            node = self.ordering_array[index]
-            # update the the post for node
-            for neighbor, weight in self.network_map[node]:
-                self.post[node] += 2 * self.post_pre[neighbor] * weight
-            self.post[node] += self.prior[node]
-            self.post[node] = max(min(self.post[node], 0.5), -0.5)
+    async def lbp_thread(self, start, end):
+        async with self.semaphore:
+            for index in range(start, end):
+                node = self.ordering_array[index]
+                # update the the post for node
+                for neighbor, weight in self.network_map[node]:
+                    self.post[node] += 2 * self.post_pre[neighbor] * weight
+                self.post[node] += self.prior[node]
+                self.post[node] = max(min(self.post[node], 0.5), -0.5)
 
-    # Multithread to speed up the calculation
-    def lbp(self):
+    # Async version of the LBP algorithm
+    async def lbp_async(self):
         self.ordering_array = list(range(self.N))
 
         # initialize posts
@@ -90,18 +87,17 @@ class SybilScar:
             random.shuffle(self.ordering_array)
             np.copyto(self.post_pre, self.post)
 
-            threads = []
-            num_nodes = int(np.ceil(self.N / self.num_threads))
-            for current_thread in range(self.num_threads):
+            tasks = []
+            num_nodes = int(
+                np.ceil(self.N / self.semaphore._value)
+            )  # Divide tasks by semaphore limit
+            for current_thread in range(self.semaphore._value):
                 start = current_thread * num_nodes
                 end = min(start + num_nodes, self.N)
-                thread = threading.Thread(target=self.lbp_thread, args=(start, end))
-                threads.append(thread)
-                thread.start()
+                task = asyncio.create_task(self.lbp_thread(start, end))
+                tasks.append(task)
 
-            for thread in threads:
-                thread.join()
-
+            await asyncio.gather(*tasks)
             iter_count += 1
 
 
@@ -113,7 +109,6 @@ class SybilScarExecutor:
     async def aget_latest_parquet_file(self):
         """Gets the latest parquet file matching a pattern."""
         file_pattern = "processed-farcaster-undirected-connections-*.parquet"
-
         parquet_files = await asyncio.to_thread(
             glob.glob, os.path.join(self.data_path, file_pattern)
         )
@@ -125,11 +120,9 @@ class SybilScarExecutor:
     def get_latest_parquet_file(self):
         """Gets the latest parquet file matching a pattern."""
         file_pattern = "processed-farcaster-undirected-connections-*.parquet"
-
         parquet_files = glob.glob(os.path.join(self.data_path, file_pattern))
         if not parquet_files:
             raise FileNotFoundError(f"No files found matching pattern: {file_pattern}")
-
         parquet_files.sort()
         return parquet_files[-1]
 
@@ -147,7 +140,7 @@ class SybilScarExecutor:
             .select("fid_index")
             .unique()
             .collect(streaming=True)
-            .sample(300, seed=42)
+            # .sample(300, seed=42)
         )
         self.sybils = (row[0] for row in sybils_df.iter_rows())
 
@@ -156,35 +149,45 @@ class SybilScarExecutor:
             .select("fid_index")
             .unique()
             .collect(streaming=True)
-            .sample(300, seed=42)
+            # .sample(300, seed=42)
         )
         self.benigns = (row[0] for row in benigns_df.iter_rows())
 
-    def run_sybil_scar(self):
-        """Execute the SybilScar algorithm on the loaded data."""
+    async def arun_sybil_scar(self):
+        """Execute the SybilScar algorithm asynchronously on the loaded data."""
         self.sybil_scar.read_network(self.connections)
         self.sybil_scar.read_prior(self.sybils, self.benigns)
-        self.sybil_scar.lbp()
+        await self.sybil_scar.lbp_async()
 
     def save_results(self, output_file: str, latest_undirected_links_path: str):
         """Write the SybilScar post results to a file."""
         posterior_df = self.sybil_scar.get_posterior(output_file)
-        latest_undirected_links_df = pl.scan_parquet(latest_undirected_links_path).select(
-            ["fid", "fid_index"]
-        ).unique()
+        latest_undirected_links_df = (
+            pl.scan_parquet(latest_undirected_links_path)
+            .select(["fid", "fid_index"])
+            .unique()
+        )
         df_lazy = posterior_df.join(latest_undirected_links_df, on="fid_index")
         df_lazy.sink_parquet(output_file)
 
-    # async def execute(self):
-    def execute(self):
+    async def execute(self):
         """Load data, run the algorithm, and save the results."""
-        logger.info("Running SybilScar...")
+        logging.info("Running SybilScar...")
         start = time.time()
-        parquet_path = self.get_latest_parquet_file()
+
+        parquet_path = await self.aget_latest_parquet_file()
+
+        logging.info(f"Loading data from: {parquet_path}")
         self.load_data(parquet_path)
-        self.run_sybil_scar()
-        self.save_results(self.data_path + "/sybil_scar_results.parquet", latest_undirected_links_path=parquet_path)
+
+        logging.info("Data loaded. Running SybilScar algorithm...")
+        await self.arun_sybil_scar()
+
+        logging.info("SybilScar algorithm executed. Saving results...")
+        self.save_results(
+            self.data_path + "/sybil_scar_results.parquet",
+            latest_undirected_links_path=parquet_path,
+        )
         end = time.time()
 
-        print(f"SybilScar execution time: {end - start:.2f} seconds")
-        return ""
+        logging.info(f"SybilScar execution time: {end - start:.2f} seconds")
