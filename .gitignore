@@ -4,6 +4,7 @@ data/
 parquet/
 
 .envrc
+.env
 
 __pycache__/
 /parquet/*
