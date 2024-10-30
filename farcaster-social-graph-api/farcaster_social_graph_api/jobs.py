@@ -19,24 +19,24 @@ async def sync_lbp_data():
     """Function to sync the LBP data pipeline."""
     logging.info("Starting LBP data sync...")
 
-    # # approx 10 minutes
-    # s3_importer = AsyncS3ParquetImporter(
-    #     s3_prefix="public-postgres/farcaster/v2/full/farcaster-links-"
-    # )
-    # file = await s3_importer.download_latest_file()
-    # logging.info(f"Downloaded latest file: {file}")
+    # approx 10 minutes
+    s3_importer = AsyncS3ParquetImporter(
+        s3_prefix="public-postgres/farcaster/v2/full/farcaster-links-"
+    )
+    file = await s3_importer.download_latest_file()
+    logging.info(f"Downloaded latest file: {file}")
 
-    # # approx 1 minute
-    # farcaster_links_aggregator = FarcasterLinksAggregator()
-    # data = await farcaster_links_aggregator.execute()
-    # logging.info("Farcaster links aggregated.")
+    # approx 1 minute
+    farcaster_links_aggregator = FarcasterLinksAggregator()
+    data = await farcaster_links_aggregator.execute()
+    logging.info("Farcaster links aggregated.")
 
-    # # approx 30 seconds
-    # farcaster_undirected_links_builder = FarcasterUndirectedLinksBuilder()
-    # data = await farcaster_undirected_links_builder.execute()
-    # logging.info("Farcaster undirected links built.")
+    # approx 30 seconds
+    farcaster_undirected_links_builder = FarcasterUndirectedLinksBuilder()
+    data = await farcaster_undirected_links_builder.execute()
+    logging.info("Farcaster undirected links built.")
 
-    # approx 35 minutes
+    # approx 5 minutes
     sybil_executor = SybilScarExecutor()
     await sybil_executor.execute()
     logging.info("SybilScar executed.")
