@@ -4,6 +4,7 @@ data/
 parquet/
 
 .envrc
+.env
 
 __pycache__/
 /parquet/*
@@ -11,6 +12,11 @@ __pycache__/
 
 data/*
 
-notebooks/*
 
 .DS_Store
+
+notebooks/**/*.parquet
+notebooks/**/*.txt
+
+Undirected_Farcaster/
+Undirected_Facebook/

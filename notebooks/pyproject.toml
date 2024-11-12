@@ -1,0 +1,28 @@
+[tool.poetry]
+name = "farcaster-social-graph-notebooks"
+version = "0.1.0"
+description = ""
+authors = ["devjoaov <joaovictorass95@gmail.com>"]
+readme = "README.md"
+package-mode = false
+
+[tool.poetry.dependencies]
+python = "^3.11"
+fastapi = "^0.115.0"
+uvicorn = "^0.31.1"
+aiofiles = "^24.1.0"
+aioboto3 = "^13.1.1"
+polars = "0.20.31"
+numpy = "^2.1.2"
+honeybadger = "^0.20.2"
+apscheduler = "^3.10.4"
+matplotlib = "^3.9.2"
+networkx = "^3.4.2"
+
+[tool.poetry.group.dev.dependencies]
+ruff = "^0.6.9"
+ipykernel = "^6.29.5"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
