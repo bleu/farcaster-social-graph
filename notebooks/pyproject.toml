@@ -18,6 +18,14 @@ honeybadger = "^0.20.2"
 apscheduler = "^3.10.4"
 matplotlib = "^3.9.2"
 networkx = "^3.4.2"
+scikit-learn = "^1.5.2"
+eth-account = "^0.13.4"
+web3 = "^7.5.0"
+eth-tester = "^0.12.0b2"
+py-evm = "^0.10.1b2"
+nltk = "^3.9.1"
+scipy = "^1.14.1"
+gql = {extras = ["requests"], version = "^3.5.0"}
 
 [tool.poetry.group.dev.dependencies]
 ruff = "^0.6.9"
