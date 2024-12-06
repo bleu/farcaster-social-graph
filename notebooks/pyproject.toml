@@ -12,11 +12,7 @@ fastapi = "^0.115.0"
 uvicorn = "^0.31.1"
 aiofiles = "^24.1.0"
 aioboto3 = "^13.1.1"
-<<<<<<< Updated upstream
-polars = "0.20.31"
-=======
 polars = "1.16.0"
->>>>>>> Stashed changes
 numpy = "2.0.2"
 honeybadger = "^0.20.2"
 apscheduler = "^3.10.4"
@@ -36,11 +32,8 @@ numba = "^0.60.0"
 llvmlite = "^0.43.0"
 shap = "^0.46.0"
 optuna = "^4.1.0"
-<<<<<<< Updated upstream
-=======
 seaborn = "^0.13.2"
 pyarrow = "^18.1.0"
->>>>>>> Stashed changes
 
 [tool.poetry.group.dev.dependencies]
 ruff = "^0.6.9"

@@ -17,7 +17,6 @@ data/*
 
 notebooks/**/*.parquet
 notebooks/**/*.txt
-!notebooks/checkpoints/** 
 
 Undirected_Farcaster/
 Undirected_Facebook/
