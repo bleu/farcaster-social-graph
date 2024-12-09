@@ -1,10 +1,10 @@
 [tool.poetry]
-name = "farcaster-social-graph-notebooks"
+name = "farcaster_sybil_detection"
 version = "0.1.0"
 description = ""
 authors = ["devjoaov <joaovictorass95@gmail.com>"]
 readme = "README.md"
-package-mode = false
+package-mode = true
 
 [tool.poetry.dependencies]
 python = "^3.11"
@@ -34,9 +34,6 @@ shap = "^0.46.0"
 optuna = "^4.1.0"
 seaborn = "^0.13.2"
 pyarrow = "^18.1.0"
-farcaster_sybil_detection = { path = "../farcaster-sybil-detection", develop = true }
-pyright = "^1.1.390"
-ipdb = "^0.13.13"
 
 [tool.poetry.group.dev.dependencies]
 ruff = "^0.6.9"
