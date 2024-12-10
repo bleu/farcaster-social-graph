@@ -4,26 +4,23 @@ from farcaster_sybil_detection.config.defaults import Config
 from farcaster_sybil_detection.models.ensemble import OptimizedEnsemble
 from farcaster_sybil_detection.services.predictor import Predictor
 from farcaster_sybil_detection.services.trainer import Trainer
-from farcaster_sybil_detection.features.interface import IFeatureProvider
-from typing import Any, Dict, Optional, Union
+from typing import Any, Dict, Union
+from farcaster_sybil_detection.features.registry import FeatureRegistry
+from farcaster_sybil_detection.features.manager import FeatureManager
 
 
 @add_logging
 class DetectorService(LoggedABC):
     """Service layer for Sybil detection"""
 
-    def __init__(
-        self, config: Config, feature_manager: Optional[IFeatureProvider] = None
-    ):
+    def __init__(self, config: Config, registry: FeatureRegistry):
         self.config = config
-        self._setup_components(feature_manager)
 
-    def _setup_components(self, feature_manager: Optional[IFeatureProvider]):
+        self._setup_components(registry)
+
+    def _setup_components(self, registry: FeatureRegistry):
         """Initialize system components"""
-        if feature_manager is None:
-            self.logger.error("FeatureProvider cannot be None")
-            raise ValueError("FeatureProvider must be provided")
-        self.feature_manager = feature_manager
+        self.feature_manager = FeatureManager(self.config, registry)
 
         self.model = OptimizedEnsemble(
             self.config.model_dir / "model.pkl",

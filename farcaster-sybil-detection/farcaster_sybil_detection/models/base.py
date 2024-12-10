@@ -68,7 +68,6 @@ class BaseModel(IModel):
         model_data = {
             "model": self.model,
             "feature_names": self.feature_names,  # Save feature names
-            "config": self.config,
         }
         if self.checkpoint_path:
             joblib.dump(model_data, self.checkpoint_path)
@@ -79,4 +78,3 @@ class BaseModel(IModel):
             model_data = joblib.load(self.checkpoint_path)
             self.model = model_data["model"]
             self.feature_names = model_data.get("feature_names", [])
-            self.config = model_data["config"]
