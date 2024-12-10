@@ -1,7 +1,5 @@
-from typing import Dict, List, Optional, Union
 from typing import List, Dict
 import polars as pl
-import numpy as np
 import re
 from farcaster_sybil_detection.features.extractors.base import FeatureExtractor
 from farcaster_sybil_detection.features.config import FeatureConfig
@@ -121,146 +119,101 @@ class UserIdentityExtractor(FeatureExtractor):
     def _extract_profile_features(
         self, loaded_datasets: Dict[str, pl.LazyFrame]
     ) -> pl.LazyFrame:
+        """Vectorized profile content analysis"""
         profiles = loaded_datasets.get("profile_with_addresses")
         if profiles is None:
             return pl.DataFrame({"fid": []}).lazy()
 
-        def safe_entropy(text: Optional[str]) -> float:
-            if not text:
-                return 0.0
-            frequencies = {}
-            for char in text:
-                frequencies[char] = frequencies.get(char, 0) + 1
-            length = len(text)
-            return -sum(
-                (freq / length) * np.log2(freq / length)
-                for freq in frequencies.values()
-            )
-
-        try:
-            return (
-                profiles.with_columns(
-                    [
-                        # Basic profile features
-                        (
-                            pl.col("fname")
-                            .str.contains(r"\.eth$")
-                            .fill_null(False)
-                            .cast(pl.Int64)
-                        ).alias("has_ens"),
-                        pl.col("bio").is_not_null().cast(pl.Int64).alias("has_bio"),
-                        pl.col("avatar_url")
-                        .is_not_null()
-                        .cast(pl.Int64)
-                        .alias("has_avatar"),
-                        pl.col("display_name")
-                        .is_not_null()
-                        .cast(pl.Int64)
-                        .alias("has_display_name"),
-                        # Lengths
-                        pl.col("display_name")
-                        .fill_null("")
-                        .str.len_chars()
-                        .alias("display_name_length"),
-                        pl.col("bio").fill_null("").str.len_chars().alias("bio_length"),
-                        # Name analysis - add fill_null for safety
-                        (
-                            pl.col("fname")
-                            .str.contains(r"\d{4,}")
-                            .fill_null(False)
-                            .cast(pl.Float64)
-                        ).alias("fname_random_numbers"),
-                        (
-                            pl.col("fname")
-                            .str.contains(r"0x[a-fA-F0-9]{40}")
-                            .fill_null(False)
-                            .cast(pl.Float64)
-                        ).alias("fname_wallet_pattern"),
-                        (
-                            pl.col("fname")
-                            .str.contains(r"[_.\-]{2,}")
-                            .fill_null(False)
-                            .cast(pl.Float64)
-                        ).alias("fname_excessive_symbols"),
-                        (
-                            pl.col("fname")
-                            .str.contains(r"(?i)\b(?:airdrop|farm|degen|wojak)\b")
-                            .fill_null(False)
-                            .cast(pl.Float64)
-                        ).alias("fname_airdrop_terms"),
-                        (
-                            pl.col("fname")
-                            .str.contains(r"20[12]\d")
-                            .fill_null(False)
-                            .cast(pl.Float64)
-                        ).alias("fname_has_year"),
-                        # Bio analysis - add fill_null for safety
-                        (
-                            pl.col("bio")
-                            .str.contains(r"\d{4,}")
-                            .fill_null(False)
-                            .cast(pl.Float64)
-                        ).alias("bio_random_numbers"),
-                        (
-                            pl.col("bio")
-                            .str.contains(r"0x[a-fA-F0-9]{40}")
-                            .fill_null(False)
-                            .cast(pl.Float64)
-                        ).alias("bio_wallet_pattern"),
-                        (
-                            pl.col("bio")
-                            .str.contains(r"[_.\-]{2,}")
-                            .fill_null(False)
-                            .cast(pl.Float64)
-                        ).alias("bio_excessive_symbols"),
-                        (
-                            pl.col("bio")
-                            .str.contains(r"(?i)\b(?:airdrop|farm|degen|wojak)\b")
-                            .fill_null(False)
-                            .cast(pl.Float64)
-                        ).alias("bio_airdrop_terms"),
-                        (
-                            pl.col("bio")
-                            .str.contains(r"20[12]\d")
-                            .fill_null(False)
-                            .cast(pl.Float64)
-                        ).alias("bio_has_year"),
-                    ]
-                )
-                # Add entropy calculations after basic features
-                .with_columns(
-                    [
-                        pl.col("fname")
-                        .fill_null("")
-                        .map_elements(safe_entropy)
-                        .alias("fname_entropy"),
-                        pl.col("bio")
-                        .fill_null("")
-                        .map_elements(safe_entropy)
-                        .alias("bio_entropy"),
-                    ]
-                )
-                # Calculate profile completeness last
-                .with_columns(
-                    [
-                        (
-                            (
-                                pl.col("has_bio")
-                                + pl.col("has_avatar")
-                                + pl.col("has_ens")
-                                + pl.col("has_display_name")
-                            ).cast(pl.Float64)
-                            / 4.0
-                        ).alias("profile_completeness")
-                    ]
-                )
-            )
-        except Exception as e:
-            self.logger.error(f"Error in profile feature extraction: {str(e)}")
-            # Return empty DataFrame with expected schema
-            return pl.DataFrame(
-                schema={name: pl.Float64 for name in self.feature_names}
-            ).lazy()
+        return profiles.with_columns(
+            [
+                # Basic features
+                pl.col("fname").str.contains(r"\.eth$").cast(pl.Int64).alias("has_ens"),
+                pl.col("bio").is_not_null().cast(pl.Int64).alias("has_bio"),
+                pl.col("avatar_url").is_not_null().cast(pl.Int64).alias("has_avatar"),
+                pl.col("display_name")
+                .is_not_null()
+                .cast(pl.Int64)
+                .alias("has_display_name"),
+                # Content length metrics
+                pl.col("display_name")
+                .str.len_chars()
+                .fill_null(0)
+                .alias("display_name_length"),
+                pl.col("bio").str.len_chars().fill_null(0).alias("bio_length"),
+                # Suspicious patterns in fname
+                pl.col("fname")
+                .str.contains(r"\d{4,}")
+                .cast(pl.Float64)
+                .alias("fname_random_numbers"),
+                pl.col("fname")
+                .str.contains(r"0x[a-fA-F0-9]{40}")
+                .cast(pl.Float64)
+                .alias("fname_wallet_pattern"),
+                pl.col("fname")
+                .str.contains(r"[_.\-]{2,}")
+                .cast(pl.Float64)
+                .alias("fname_excessive_symbols"),
+                pl.col("fname")
+                .str.contains(r"(?i)\b(airdrop|farm|degen|wojak)\b")
+                .cast(pl.Float64)
+                .alias("fname_airdrop_terms"),
+                pl.col("fname")
+                .str.contains(r"\b(19|20)\d{2}\b")
+                .cast(pl.Float64)
+                .alias("fname_has_year"),
+                # Suspicious patterns in bio
+                pl.col("bio")
+                .str.contains(r"\d{4,}")
+                .cast(pl.Float64)
+                .alias("bio_random_numbers"),
+                pl.col("bio")
+                .str.contains(r"0x[a-fA-F0-9]{40}")
+                .cast(pl.Float64)
+                .alias("bio_wallet_pattern"),
+                pl.col("bio")
+                .str.contains(r"[_.\-]{2,}")
+                .cast(pl.Float64)
+                .alias("bio_excessive_symbols"),
+                pl.col("bio")
+                .str.contains(r"(?i)\b(airdrop|farm|degen|wojak)\b")
+                .cast(pl.Float64)
+                .alias("bio_airdrop_terms"),
+                pl.col("bio")
+                .str.contains(r"\b(19|20)\d{2}\b")
+                .cast(pl.Float64)
+                .alias("bio_has_year"),
+                # Character diversity (approximation of entropy using unique characters)
+                (
+                    pl.col("fname")
+                    .str.replace_all(r"[^a-zA-Z0-9]", "")
+                    .str.to_lowercase()
+                    .str.explode()
+                    .n_unique()
+                    .truediv(pl.col("fname").str.len_chars() + 1)
+                ).alias("fname_entropy"),
+                (
+                    pl.col("bio")
+                    .str.replace_all(r"[^a-zA-Z0-9]", "")
+                    .str.to_lowercase()
+                    .str.explode()
+                    .n_unique()
+                    .truediv(pl.col("bio").str.len_chars() + 1)
+                ).alias("bio_entropy"),
+            ]
+        ).with_columns(
+            [
+                # Profile completeness score
+                (
+                    (
+                        pl.col("has_bio")
+                        + pl.col("has_avatar")
+                        + pl.col("has_ens")
+                        + pl.col("has_display_name")
+                    )
+                    / 4.0
+                ).alias("profile_completeness"),
+            ]
+        )
 
     def _extract_verification_features(
         self, loaded_datasets: Dict[str, pl.LazyFrame]
@@ -411,10 +364,4 @@ class UserIdentityExtractor(FeatureExtractor):
                     )
                 ).alias("resource_utilization"),
             ]
-        )
-
-    def _get_default_features(self, df: pl.LazyFrame) -> pl.LazyFrame:
-        """Return DataFrame with default zero values for all features"""
-        return df.with_columns(
-            [pl.lit(0).alias(feature) for feature in self.feature_names]
         )

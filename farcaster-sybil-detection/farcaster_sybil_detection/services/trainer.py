@@ -1,3 +1,4 @@
+from sklearn.preprocessing import StandardScaler
 from typing import Dict, List, Tuple
 import logging
 from farcaster_sybil_detection.features.interface import IFeatureProvider
@@ -81,7 +82,7 @@ class Trainer:
         label_fids = labels_df["fid"].unique().to_list()
         self.logger.info(f"Preparing features for {len(label_fids)} labeled fids")
 
-        # Now build feature matrix only for these fids
+        # Build feature matrix only for these fids - ONLY DO THIS ONCE
         matrix = self.feature_manager.build_feature_matrix(target_fids=label_fids)
 
         # Ensure consistent FID types
@@ -91,37 +92,75 @@ class Trainer:
         data = matrix.join(labels_df, on="fid", how="inner")
         self.logger.info(f"Initial data shape after joining with labels: {data.shape}")
 
-        # Rest of the method remains the same...
-        # Identify and drop non-numeric columns
-        column_types_to_drop = {
-            col: str(data[col].dtype)
-            for col in data.columns
-            if str(data[col].dtype) not in ["Int64", "Float64", "Int32", "Float32"]
-        }
-        columns_to_drop = list(column_types_to_drop.keys())
-        if columns_to_drop:
-            self.logger.info(
-                f"Dropping non-numeric columns: {', '.join([f'{col} ({column_types_to_drop[col]})' for col in columns_to_drop])}"
-            )
+        # Identify non-numeric columns to drop
+        columns_to_drop = ["fid"]  # Always drop fid
+        for col in data.columns:
+            if col != "bot":  # Keep the target variable
+                dtype = str(data[col].dtype)
+                if "List" in dtype or dtype not in [
+                    "Int64",
+                    "Float64",
+                    "Int32",
+                    "Float32",
+                    "UInt32",
+                ]:
+                    columns_to_drop.append(col)
 
-        # Add identity columns to drop list
-        columns_to_drop += ["fid", "bot"]
+        if columns_to_drop:
+            self.logger.info(f"Dropping non-numeric columns: {columns_to_drop}")
 
         # Handle missing values before converting to numpy
         numeric_data = data.drop(columns_to_drop)
 
-        # Fill remaining nulls with 0
-        numeric_data = numeric_data.fill_null(0)
+        # Convert remaining numeric columns to Float64 and handle inf/nan values
+        convert_cols = [col for col in numeric_data.columns if col != "bot"]
+
+        expressions = []
+        for col in convert_cols:
+            expr = (
+                pl.when(pl.col(col).is_infinite())
+                .then(None)  # Convert inf to null first
+                .otherwise(pl.col(col))
+                .cast(pl.Float64)
+                .alias(col)
+            )
+            expressions.append(expr)
+
+        # Add bot column to expressions
+        expressions.append(pl.col("bot"))
+
+        # Apply transformations
+        numeric_data = numeric_data.with_columns(expressions)
+
+        # Replace nulls with median/mean for each column
+        expressions = []
+        for col in convert_cols:
+            median = numeric_data.select(pl.col(col).median()).item()
+            expr = (
+                pl.col(col)
+                .fill_null(median)  # Use median instead of mean for robustness
+                .clip(-1e9, 1e9)  # Clip very large values
+                .alias(col)
+            )
+            expressions.append(expr)
+
+        numeric_data = numeric_data.with_columns(expressions)
 
         # Convert to numpy arrays
-        X = numeric_data.to_numpy()
-        feature_names = numeric_data.columns
-        y = data["bot"].to_numpy()
+        feature_names = [col for col in numeric_data.columns if col != "bot"]
+        X = numeric_data.select(feature_names).to_numpy()
+        y = numeric_data.select("bot").to_numpy().ravel()
+
+        # Final verification that no inf/nan values remain
+        if np.any(~np.isfinite(X)):
+            self.logger.warning("Replacing remaining non-finite values")
+            X = np.nan_to_num(X, nan=0.0, posinf=1e9, neginf=-1e9)
 
         self.logger.info(f"Final feature matrix shape: {X.shape}")
         self.logger.info(f"Number of features: {len(feature_names)}")
 
-        return X, y, feature_names
+        X_scaled = StandardScaler().fit_transform(X)
+        return X_scaled, y, feature_names
 
     def _validate_data(self, X: np.ndarray, y: np.ndarray, feature_names: List[str]):
         """Validate data before training"""

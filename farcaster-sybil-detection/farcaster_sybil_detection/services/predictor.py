@@ -146,25 +146,22 @@ class Predictor:
             # Get predictions
             y_prob = self.model.predict_proba(X)[:, 1]
             y_pred = (y_prob >= 0.5).astype(int)
+
+            # Get confidence and ensure it's a float
             confidence = self.model.get_prediction_confidence(X)
+            if isinstance(confidence, np.ndarray):
+                confidence = float(confidence[0])
+            else:
+                confidence = float(confidence)
 
-            # # Generate SHAP explanations
-            # self.logger.info("Generating SHAP explanations.")
-            # explainer = shap.Explainer(self.model, X)
-            # shap_values = explainer(X)
-            # explanation = shap_values[0]  # SHAP values for the first (and only) instance
-
-            # # Optional: Plot SHAP waterfall for this instance
-            # shap.plots.waterfall(shap_values[0])
-            # plt.show()
+            # Ensure confidence is not nan
+            if np.isnan(confidence):
+                confidence = 1.0 if y_prob[0] > 0.9 or y_prob[0] < 0.1 else 0.5
 
             return {
                 "prediction": int(y_pred[0]),
                 "probability": float(y_prob[0]),
-                "confidence": float(
-                    confidence[0] if isinstance(confidence, np.ndarray) else confidence
-                ),
-                # 'explanation': explanation.values.tolist(),
+                "confidence": confidence,
                 "prediction_label": "bot" if y_pred[0] == 1 else "human",
                 "features_used": feature_cols,
             }

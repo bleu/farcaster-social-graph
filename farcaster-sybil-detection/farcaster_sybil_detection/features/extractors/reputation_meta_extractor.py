@@ -27,13 +27,13 @@ class ReputationMetaExtractor(FeatureExtractor):
             "centrality_score",
             "relationship_health",
             "community_standing",
-            # Engagement reputation
-            "engagement_quality",
-            "content_impact",
-            "interaction_value",
-            "contribution_score",
-            "participation_quality",
-            "value_generation",
+            # # Engagement reputation
+            # "engagement_quality",
+            # "content_impact",
+            # "interaction_value",
+            # "contribution_score",
+            # "participation_quality",
+            # "value_generation",
             # Behavioral reputation
             "behavior_consistency",
             "pattern_reliability",
@@ -70,18 +70,18 @@ class ReputationMetaExtractor(FeatureExtractor):
                 "columns": ["fid", "follower_count", "following_count", "created_at"],
                 "source": "nindexer",
             },
-            "engagement_metrics": {
-                "columns": ["fid", "engagement_rate", "quality_score"],
+            # "engagement_metrics": {
+            #     "columns": ["fid", "engagement_rate", "quality_score"],
+            #     "source": "farcaster",
+            # },
+            "verifications": {
+                "columns": ["fid", "timestamp", "deleted_at", "claim"],
                 "source": "farcaster",
             },
-            "verification_data": {
-                "columns": ["fid", "verification_count", "platform_count"],
-                "source": "farcaster",
-            },
-            "activity_data": {
-                "columns": ["fid", "activity_type", "timestamp", "impact_score"],
-                "source": "farcaster",
-            },
+            # "activity_data": {
+            #     "columns": ["fid", "activity_type", "timestamp", "impact_score"],
+            #     "source": "farcaster",
+            # },
         }
 
     def extract_features(
@@ -93,7 +93,7 @@ class ReputationMetaExtractor(FeatureExtractor):
             # Extract each category of features
             core_scores = self._extract_core_scores(loaded_datasets)
             network_reputation = self._extract_network_reputation(loaded_datasets)
-            engagement_reputation = self._extract_engagement_reputation(loaded_datasets)
+            # engagement_reputation = self._extract_engagement_reputation(loaded_datasets)
             behavioral_reputation = self._extract_behavioral_reputation(loaded_datasets)
             trust_metrics = self._extract_trust_metrics(loaded_datasets)
             meta_scores = self._extract_meta_scores(loaded_datasets)
@@ -103,7 +103,7 @@ class ReputationMetaExtractor(FeatureExtractor):
             for features in [
                 core_scores,
                 network_reputation,
-                engagement_reputation,
+                # engagement_reputation,
                 behavioral_reputation,
                 trust_metrics,
                 meta_scores,
@@ -122,10 +122,6 @@ class ReputationMetaExtractor(FeatureExtractor):
     ) -> pl.LazyFrame:
         neynar_scores = loaded_datasets.get("neynar_user_scores")
         follow_counts = loaded_datasets.get("follow_counts")
-        engagement_metrics = loaded_datasets.get("engagement_metrics")
-
-        if not any([neynar_scores, follow_counts, engagement_metrics]):
-            return pl.DataFrame({"fid": []}).lazy()
 
         result = pl.DataFrame(schema={"fid": pl.Int64}).lazy()
 
@@ -165,19 +161,6 @@ class ReputationMetaExtractor(FeatureExtractor):
             )
             result = result.join(activity_features, on="fid", how="left")
 
-        # Process engagement metrics
-        if engagement_metrics is not None:
-            quality_features = engagement_metrics.group_by("fid").agg(
-                [
-                    pl.col("quality_score").mean().alias("quality_score"),
-                    pl.col("quality_score")
-                    .truediv(pl.col("engagement_rate"))
-                    .mean()
-                    .alias("trust_score"),
-                ]
-            )
-            result = result.join(quality_features, on="fid", how="left")
-
         return result
 
     def _extract_network_reputation(
@@ -187,7 +170,7 @@ class ReputationMetaExtractor(FeatureExtractor):
         activity_data = loaded_datasets.get("activity_data")
 
         if follow_counts is None and activity_data is None:
-            return pl.DataFrame({"fid": []}).lazy()
+            return None
 
         result = pl.DataFrame(schema={"fid": pl.Int64}).lazy()
 
@@ -253,7 +236,7 @@ class ReputationMetaExtractor(FeatureExtractor):
         activity_data = loaded_datasets.get("activity_data")
 
         if engagement_metrics is None and activity_data is None:
-            return pl.DataFrame({"fid": []}).lazy()
+            return None
 
         result = pl.DataFrame(schema={"fid": pl.Int64}).lazy()
 
@@ -302,7 +285,7 @@ class ReputationMetaExtractor(FeatureExtractor):
     ) -> pl.LazyFrame:
         activity_data = loaded_datasets.get("activity_data")
         if activity_data is None:
-            return pl.DataFrame({"fid": []}).lazy()
+            return None
 
         return (
             activity_data.with_columns(
@@ -357,66 +340,57 @@ class ReputationMetaExtractor(FeatureExtractor):
     def _extract_trust_metrics(
         self, loaded_datasets: Dict[str, pl.LazyFrame]
     ) -> pl.LazyFrame:
-        verification_data = loaded_datasets.get("verification_data")
-        activity_data = loaded_datasets.get("activity_data")
+        verifications = loaded_datasets.get("verifications")
+
+        if verifications is None:
+            return None
 
         result = pl.DataFrame(schema={"fid": pl.Int64}).lazy()
 
-        if verification_data is not None:
-            trust_features = verification_data.group_by("fid").agg(
-                [
-                    # Strength of verification
-                    (pl.col("verification_count") * pl.col("platform_count")).alias(
-                        "verification_strength"
-                    ),
-                    # Confidence in identity
-                    (
-                        pl.col("platform_count") / 10.0
-                    ).alias(  # Normalized to max platforms
-                        "identity_confidence"
-                    ),
-                ]
+        if verifications is not None:
+            # Calculate verification metrics
+            trust_features = (
+                verifications.filter(pl.col("deleted_at").is_null())
+                .group_by("fid")
+                .agg(
+                    [
+                        # Count total verifications
+                        pl.count().alias("verification_count"),
+                        # Count unique verification types from claim
+                        pl.col("claim").n_unique().alias("platform_count"),
+                    ]
+                )
+                .with_columns(
+                    [
+                        # Strength of verification
+                        (pl.col("verification_count") * pl.col("platform_count")).alias(
+                            "verification_strength"
+                        ),
+                        # Confidence in identity (normalized by max platforms)
+                        (pl.col("platform_count") / 10.0).alias("identity_confidence"),
+                        # Spam resistance (inverse of verification frequency)
+                        (1 - 1 / (pl.col("verification_count") + 1)).alias(
+                            "spam_resistance"
+                        ),
+                        # Abuse likelihood (inverse of platform diversity)
+                        (1 - pl.col("platform_count") / pl.col("verification_count"))
+                        .clip(0, 1)
+                        .alias("abuse_likelihood"),
+                        # Credibility score
+                        (pl.col("platform_count") / pl.col("verification_count")).alias(
+                            "credibility_score"
+                        ),
+                        # Reliability index
+                        (
+                            (pl.col("verification_count") * pl.col("platform_count"))
+                            / 100.0
+                        )
+                        .clip(0, 1)
+                        .alias("reliability_index"),
+                    ]
+                )
             )
             result = result.join(trust_features, on="fid", how="left")
-
-        if activity_data is not None:
-            reliability_features = activity_data.group_by("fid").agg(
-                [
-                    # Resistance to spam behavior
-                    (
-                        1
-                        - pl.col("timestamp")
-                        .diff()
-                        .dt.total_seconds()
-                        .filter(pl.col("timestamp").diff().dt.total_seconds() < 60)
-                        .count()
-                        / pl.count()
-                    ).alias("spam_resistance"),
-                    # Likelihood of abuse
-                    (
-                        pl.col("impact_score")
-                        .filter(pl.col("impact_score") < 0)
-                        .count()
-                        / pl.count()
-                    ).alias("abuse_likelihood"),
-                    # Overall credibility
-                    pl.col("impact_score")
-                    .filter(pl.col("impact_score") > pl.col("impact_score").mean())
-                    .count()
-                    .truediv(pl.count())
-                    .alias("credibility_score"),
-                    # Reliability index
-                    (
-                        pl.col("impact_score").mean()
-                        * (
-                            1
-                            - pl.col("impact_score").std()
-                            / pl.col("impact_score").mean()
-                        )
-                    ).alias("reliability_index"),
-                ]
-            )
-            result = result.join(reliability_features, on="fid", how="left")
 
         return result
 
@@ -427,7 +401,7 @@ class ReputationMetaExtractor(FeatureExtractor):
         activity_data = loaded_datasets.get("activity_data")
 
         if follow_counts is None and activity_data is None:
-            return pl.DataFrame({"fid": []}).lazy()
+            return None
 
         result = pl.DataFrame(schema={"fid": pl.Int64}).lazy()
 

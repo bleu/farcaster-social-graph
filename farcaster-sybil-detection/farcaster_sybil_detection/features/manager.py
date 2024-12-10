@@ -42,9 +42,6 @@ from farcaster_sybil_detection.features.extractors.farcaster.update_behavior imp
 from farcaster_sybil_detection.features.extractors.farcaster.mentions import (
     MentionsExtractor,
 )
-from farcaster_sybil_detection.features.extractors.farcaster.storage_usage import (
-    StorageExtractor,
-)
 from farcaster_sybil_detection.features.extractors.nindexer.network_extractor import (
     EnhancedNetworkExtractor,
 )
@@ -131,9 +128,9 @@ class FeatureManager(IFeatureProvider):
         return {
             # new features
             "user_identity": UserIdentityExtractor(feature_config, self.data_loader),
-            # "temporal_behavior": TemporalBehaviorExtractor(
-            #     feature_config, self.data_loader
-            # ),
+            "temporal_behavior": TemporalBehaviorExtractor(
+                feature_config, self.data_loader
+            ),
             "network_analysis": NetworkAnalysisExtractor(
                 feature_config, self.data_loader
             ),
@@ -201,7 +198,11 @@ class FeatureManager(IFeatureProvider):
             ]
 
             # Use join_asof for time series data if needed
-            result = df.join(new_features.select(join_cols), on="fid", how="left")
+            result = df.join(
+                new_features.select(join_cols),
+                on="fid",
+                how="left",
+            )
             return result
 
         except Exception as e:
@@ -402,11 +403,7 @@ class FeatureManager(IFeatureProvider):
                 new_features_lf = extractor.run(feature_matrix, target_fids=base_fids)
 
                 if new_features_lf is not None:
-                    # Process incrementally
                     new_features_df = new_features_lf.collect()
-                    # new_features_df = self._process_features_incrementally(
-                    #     feature_matrix, new_features_lf, feature_name
-                    # )
 
                     # Cache the result
                     self._cache_filtered_dataset(new_features_df, cache_key)

@@ -98,12 +98,12 @@ class DatasetLoader:
 
         if len(fids_to_use) > 0:
             lf = (
-                pl.scan_parquet(path, low_memory=True)
+                pl.scan_parquet(path)
                 .filter(pl.col("fid").is_not_null(), pl.col("fid").is_in(fids_to_use))
                 .select(cols_to_load)
             )
         else:
-            lf = pl.scan_parquet(path, low_memory=True).select(cols_to_load)
+            lf = pl.scan_parquet(path).select(cols_to_load)
 
         self.logger.info(f"Loading {name} with columns: {cols_to_load}")
 
@@ -146,4 +146,4 @@ class DatasetLoader:
         path = self._get_dataset_path(source, name)
         if not path.exists():
             raise FileNotFoundError(f"Dataset {source}-{name} not found at {path}")
-        return pl.scan_parquet(path, parallel="prefiltered", low_memory=True).columns
+        return pl.scan_parquet(path, parallel="prefiltered").columns

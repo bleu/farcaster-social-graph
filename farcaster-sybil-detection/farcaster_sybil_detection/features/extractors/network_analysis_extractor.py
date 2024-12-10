@@ -18,37 +18,37 @@ class NetworkAnalysisExtractor(FeatureExtractor):
             "follow_ratio",
             "unique_followers",
             "unique_following",
-            # # Growth and velocity
-            # "network_growth_rate",
-            # "follow_velocity",
-            # "network_age_hours",
-            # "growth_stability",
-            # "follower_growth_rate",
-            # "following_growth_rate",
-            # # Network quality metrics
-            # "follow_reciprocity",
-            # "network_density",
+            # Growth and velocity
+            "network_growth_rate",
+            "follow_velocity",
+            "network_age_hours",
+            "growth_stability",
+            "follower_growth_rate",
+            "following_growth_rate",
+            # Network quality metrics
+            "follow_reciprocity",
+            "network_density",
             # "cluster_coefficient",
-            # "network_reach",
+            "network_reach",
             # "influential_followers",
             # "influencer_ratio",
-            # # Power user interactions
-            # "power_user_interaction_rate",
-            # "power_user_engagement",
-            # "power_user_influence",
-            # "power_user_reciprocity",
-            # "power_user_reach",
-            # "power_user_alignment",
-            # # Network stability
-            # "network_churn_rate",
-            # "relationship_longevity",
-            # "network_volatility",
-            # "stable_connections",
-            # # Advanced metrics
-            # "network_centrality",
-            # "bridge_score",
-            # "community_embedding",
-            # "network_diversity",
+            # Power user interactions
+            "power_user_interaction_rate",
+            "power_user_engagement",
+            "power_user_influence",
+            "power_user_reciprocity",
+            "power_user_reach",
+            "power_user_alignment",
+            # Network stability
+            "network_churn_rate",
+            "relationship_longevity",
+            "network_volatility",
+            "stable_connections",
+            # Advanced metrics
+            "network_centrality",
+            "bridge_score",
+            "community_embedding",
+            "network_diversity",
         ]
 
     def get_dependencies(self) -> List[str]:
@@ -89,21 +89,23 @@ class NetworkAnalysisExtractor(FeatureExtractor):
 
             # Extract each feature category
             basic_metrics = self._extract_basic_metrics(loaded_datasets)
-            # growth_metrics = self._extract_growth_metrics(loaded_datasets)
-            # quality_metrics = self._extract_quality_metrics(loaded_datasets)
-            # power_follow_counts = self._extract_power_follow_counts(loaded_datasets)
-            # stability_metrics = self._extract_stability_metrics(loaded_datasets)
-            # advanced_metrics = self._extract_advanced_metrics(loaded_datasets)
+            growth_metrics = self._extract_growth_metrics(loaded_datasets)
+            quality_metrics = self._extract_quality_metrics(loaded_datasets)
+            power_follow_counts = self._extract_power_follow_counts(loaded_datasets)
+            stability_metrics = self._extract_stability_metrics(loaded_datasets)
+            centrality_metrics = self._extract_centrality_metrics(loaded_datasets)
+            advanced_metrics = self._extract_advanced_metrics(loaded_datasets)
 
             # Combine all features
             result = df.clone()
             for metrics in [
                 basic_metrics,
-                # growth_metrics,
-                # quality_metrics,
-                # power_follow_counts,
-                # stability_metrics,
-                # advanced_metrics,
+                growth_metrics,
+                quality_metrics,
+                power_follow_counts,
+                stability_metrics,
+                centrality_metrics,
+                advanced_metrics,
             ]:
                 if metrics is not None:
                     result = result.join(metrics, on="fid", how="left")
@@ -113,6 +115,71 @@ class NetworkAnalysisExtractor(FeatureExtractor):
         except Exception as e:
             self.logger.error(f"Error extracting network analysis features: {e}")
             raise
+
+    def _extract_centrality_metrics(
+        self, loaded_datasets: Dict[str, pl.LazyFrame]
+    ) -> pl.LazyFrame:
+        """Vectorized network centrality calculation"""
+        follows = loaded_datasets.get("follows")
+        if follows is None:
+            return pl.DataFrame({"fid": []}).lazy()
+
+        # Clean follows data
+        follows_clean = follows.filter(pl.col("deleted_at").is_null())
+
+        # Calculate outgoing connections (following)
+        out_degree = follows_clean.group_by("fid").agg(
+            [
+                pl.col("target_fid").count().alias("out_degree"),
+                pl.col("target_fid").n_unique().alias("unique_out_degree"),
+            ]
+        )
+
+        # Calculate incoming connections (followers)
+        in_degree = (
+            follows_clean.group_by("target_fid")
+            .agg(
+                [
+                    pl.col("fid").count().alias("in_degree"),
+                    pl.col("fid").n_unique().alias("unique_in_degree"),
+                ]
+            )
+            .rename({"target_fid": "fid"})
+        )
+
+        # Join and calculate metrics
+        return out_degree.join(in_degree, on="fid", how="outer").with_columns(
+            [
+                # Normalize degrees by total network size
+                pl.col("out_degree").fill_null(0),
+                pl.col("in_degree").fill_null(0),
+                pl.col("unique_out_degree").fill_null(0),
+                pl.col("unique_in_degree").fill_null(0),
+                # Calculate centrality scores
+                (
+                    (pl.col("out_degree") + pl.col("in_degree"))
+                    / (pl.col("out_degree").max() + pl.col("in_degree").max())
+                )
+                .fill_null(0)
+                .alias("centrality_score"),
+                # Calculate bridging score
+                (
+                    pl.col("unique_out_degree")
+                    * pl.col("unique_in_degree")
+                    / (pl.col("out_degree") + pl.col("in_degree") + 1)
+                )
+                .fill_null(0)
+                .alias("bridge_score"),
+                # Calculate clustering coefficient
+                (
+                    pl.col("unique_out_degree")
+                    * pl.col("unique_in_degree")
+                    / ((pl.col("out_degree") + 1) * (pl.col("in_degree") + 1))
+                )
+                .fill_null(0)
+                .alias("clustering_coefficient"),
+            ]
+        )
 
     def _extract_basic_metrics(
         self, loaded_datasets: Dict[str, pl.LazyFrame]

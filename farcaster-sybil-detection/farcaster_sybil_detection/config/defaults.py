@@ -19,7 +19,7 @@ class Config:
     confidence_thresholds: Optional[Dict[str, float]] = None
     authenticity_thresholds: Optional[Dict[str, float]] = None
     feature_config: FeatureConfig = field(default_factory=FeatureConfig)
-    sample_size: int = 10_000
+    sample_size: int = 200_000
     fids_to_ensure: Optional[List[int]] = None
 
     def __post_init__(self):
