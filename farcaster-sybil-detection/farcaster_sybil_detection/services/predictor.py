@@ -1,11 +1,8 @@
 import numpy as np
 import polars as pl
-import shap
-import matplotlib.pyplot as plt
 from farcaster_sybil_detection.features.manager import FeatureManager
 from farcaster_sybil_detection.models.base import BaseModel
 from farcaster_sybil_detection.config.defaults import Config
-from farcaster_sybil_detection.evaluation.metrics import EvaluationMetrics
 from typing import Any, Dict, Optional, Union, Tuple
 import logging
 
@@ -38,7 +35,7 @@ class Predictor:
     def _load_id_mapping(self) -> pl.DataFrame:
         """Load or retrieve cached ID mapping"""
         if self._id_mapping is None:
-            self.logger.info("Loading ID mapping from profile data...")
+            self.logger.debug("Loading ID mapping from profile data...")
             self._id_mapping = self.feature_manager.data_loader.load_dataset(
                 "profile_with_addresses", columns=["fid", "fname"]
             )
@@ -68,7 +65,7 @@ class Predictor:
     def predict(self, identifier: Union[int, str]) -> Dict[str, Any]:
         """Make prediction for a single identifier"""
         try:
-            self.logger.info(f"Predicting for identifier: {identifier}")
+            self.logger.debug(f"Predicting for identifier: {identifier}")
 
             # First, resolve the identifier
             fid, fname = self._resolve_identifier(identifier)
@@ -93,10 +90,10 @@ class Predictor:
                         "error": f"Failed to build features for FID: {fid}",
                         "status": "feature_build_failed",
                     }
-                self.logger.info(f"Features built successfully for FID: {fid}")
+                self.logger.debug(f"Features built successfully for FID: {fid}")
 
             # Generate prediction
-            self.logger.info(f"Generating prediction using {features}")
+            self.logger.debug(f"Generating prediction using {features}")
             prediction_result = self._generate_prediction(features)
 
             # Add identifier information
@@ -115,12 +112,12 @@ class Predictor:
             # Get current feature columns (excluding 'fid')
             feature_cols = [col for col in features.columns if col != "fid"]
 
-            self.logger.info(f"Generating prediction using shape: {features.shape}")
+            self.logger.debug(f"Generating prediction using shape: {features.shape}")
             print(features)  # Log full feature matrix for debugging
 
             # Get expected features from model
             model_features = self.model.feature_names
-            self.logger.info(f"Model features: {model_features}")
+            self.logger.debug(f"Model features: {model_features}")
 
             if not model_features:
                 raise ValueError(
@@ -140,7 +137,7 @@ class Predictor:
                 )
 
             # Use only the features the model expects, in the correct order
-            self.logger.info(f"Predicting for features: {model_features}")
+            self.logger.debug(f"Predicting for features: {model_features}")
             X = features.select(model_features).to_numpy()
 
             # Get predictions
@@ -172,4 +169,4 @@ class Predictor:
     def clear_cache(self):
         """Clear the ID mapping cache"""
         self._id_mapping = None
-        self.logger.info("ID mapping cache cleared")
+        self.logger.debug("ID mapping cache cleared")

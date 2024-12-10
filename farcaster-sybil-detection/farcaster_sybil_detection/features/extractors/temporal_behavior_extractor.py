@@ -98,7 +98,7 @@ class TemporalBehaviorExtractor(FeatureExtractor):
         self, df: pl.LazyFrame, loaded_datasets: Dict[str, pl.LazyFrame]
     ) -> pl.LazyFrame:
         try:
-            self.logger.info("Extracting temporal behavior features...")
+            self.logger.debug("Extracting temporal behavior features...")
 
             # Extract each feature category
             timing_metrics = self._extract_timing_metrics(loaded_datasets)
@@ -110,19 +110,19 @@ class TemporalBehaviorExtractor(FeatureExtractor):
             channel_metrics = self._extract_channel_metrics(loaded_datasets)
 
             # Debugging: Check schemas and row counts
-            self.logger.info(f"Schema of timing_metrics: {timing_metrics.schema}")
+            self.logger.debug(f"Schema of timing_metrics: {timing_metrics.schema}")
 
-            self.logger.info(f"Schema of pattern_metrics: {pattern_metrics.schema}")
+            self.logger.debug(f"Schema of pattern_metrics: {pattern_metrics.schema}")
 
-            self.logger.info(
+            self.logger.debug(
                 f"Schema of consistency_metrics: {consistency_metrics.schema}"
             )
 
-            self.logger.info(
+            self.logger.debug(
                 f"Schema of distribution_metrics: {distribution_metrics.schema}"
             )
 
-            self.logger.info(f"Schema of advanced_metrics: {advanced_metrics.schema}")
+            self.logger.debug(f"Schema of advanced_metrics: {advanced_metrics.schema}")
 
             # Combine all features
             result = df.clone()
@@ -151,7 +151,7 @@ class TemporalBehaviorExtractor(FeatureExtractor):
                     validate_fid_schema(metrics, name)
                     # Proceed with join
                     result = result.join(metrics, on="fid", how="left")
-                    self.logger.info(
+                    self.logger.debug(
                         f"Joined {name} with result. Current schema: {result.schema}"
                     )
 

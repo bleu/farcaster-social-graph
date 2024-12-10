@@ -134,7 +134,7 @@ class FeatureManager(IFeatureProvider):
         try:
             # Handle first feature set
             if df is None or df.is_empty():
-                self.logger.info(f"Starting new feature matrix with {feature_name}")
+                self.logger.debug(f"Starting new feature matrix with {feature_name}")
                 return new_features
 
             if new_features is None or new_features.is_empty():
@@ -176,10 +176,10 @@ class FeatureManager(IFeatureProvider):
                     )
 
             # Join with guaranteed FID type consistency
-            self.logger.info(f"Joining features from {feature_name}: {new_cols}")
-            self.logger.info(f"Existing columns: {df.columns}")
-            self.logger.info(f"New columns: {new_features.columns}")
-            self.logger.info(f"Safe features columns: {safe_features.columns}")
+            self.logger.debug(f"Joining features from {feature_name}: {new_cols}")
+            self.logger.debug(f"Existing columns: {df.columns}")
+            self.logger.debug(f"New columns: {new_features.columns}")
+            self.logger.debug(f"Safe features columns: {safe_features.columns}")
             safe_features = safe_features.unique(subset=["fid"])
             result = df.join(
                 safe_features.select(["fid"] + new_cols).with_columns(
@@ -209,7 +209,7 @@ class FeatureManager(IFeatureProvider):
 
         process = psutil.Process()
         memory = process.memory_info().rss / 1024 / 1024
-        self.logger.info(f"{message} - Memory usage: {memory:.2f} MB")
+        self.logger.debug(f"{message} - Memory usage: {memory:.2f} MB")
 
     def _process_features_incrementally(
         self,
@@ -218,7 +218,7 @@ class FeatureManager(IFeatureProvider):
         feature_name: str,
     ) -> pl.DataFrame:
         """Process features in chunks with comprehensive type handling"""
-        self.logger.info(f"Starting incremental processing for {feature_name}")
+        self.logger.debug(f"Starting incremental processing for {feature_name}")
 
         result = None
         row_count = 0
@@ -226,7 +226,7 @@ class FeatureManager(IFeatureProvider):
         try:
             for chunk in new_features_lf.collect(streaming=True):
                 chunk_size = len(chunk)
-                self.logger.info(f"Processing chunk of size {chunk_size}")
+                self.logger.debug(f"Processing chunk of size {chunk_size}")
 
                 # Cast each column individually to handle errors gracefully
                 safe_chunk = pl.DataFrame(chunk)
@@ -242,7 +242,7 @@ class FeatureManager(IFeatureProvider):
                 )
 
                 row_count += chunk_size
-                self.logger.info(f"Processed {row_count} total rows")
+                self.logger.debug(f"Processed {row_count} total rows")
 
                 # Clean up
                 del chunk
@@ -255,7 +255,7 @@ class FeatureManager(IFeatureProvider):
                 # Final cleanup to ensure all types are correct
                 final_result = result
 
-                self.logger.info(f"Final result schema: {final_result.schema}")
+                self.logger.debug(f"Final result schema: {final_result.schema}")
                 return final_result
 
             return None
@@ -294,11 +294,11 @@ class FeatureManager(IFeatureProvider):
                 )
                 base_fids = feature_matrix.select("fid").collect()["fid"].to_list()
 
-            self.logger.info(f"Base FIDs: {len(base_fids)}")
-            self.logger.info(
+            self.logger.debug(f"Base FIDs: {len(base_fids)}")
+            self.logger.debug(
                 f"Feature matrix schema: {feature_matrix.schema} ({len(feature_matrix.columns)} columns)"
             )
-            self.logger.info(f"Feature matrix size: {(feature_matrix.count())}")
+            self.logger.debug(f"Feature matrix size: {(feature_matrix.count())}")
             # Process each feature extractor
             for feature_name in self._get_build_order():
                 self._log_memory(f"Starting {feature_name}")
@@ -310,7 +310,7 @@ class FeatureManager(IFeatureProvider):
                 cached_features = self._get_cached_filtered_dataset(cache_key)
 
                 if cached_features is not None:
-                    self.logger.info(f"Using cached features for {feature_name}")
+                    self.logger.debug(f"Using cached features for {feature_name}")
                     feature_matrix = self._safe_join_features(
                         feature_matrix, cached_features, feature_name
                     )
@@ -336,7 +336,7 @@ class FeatureManager(IFeatureProvider):
                 self._log_memory(f"Completed {feature_name}")
 
             # Final collection
-            self.logger.info("Collecting final feature matrix")
+            self.logger.debug("Collecting final feature matrix")
             result = feature_matrix.collect()
             self._log_memory("Feature matrix build completed")
 
@@ -351,7 +351,7 @@ class FeatureManager(IFeatureProvider):
         Get correct build order based on feature names and dependencies,
         using get_required_datasets to identify raw data columns.
         """
-        self.logger.info("Determining feature build order...")
+        self.logger.debug("Determining feature build order...")
 
         visited = set()
         visiting = set()
@@ -477,7 +477,7 @@ class FeatureManager(IFeatureProvider):
             )
             raise ValueError("Missing Feature Dependencies:\n" + full_error_msg)
 
-        self.logger.info(f"Build order determined successfully: {order}")
+        self.logger.debug(f"Build order determined successfully: {order}")
         return order
 
     def _needs_rebuild(self, feature_set: FeatureSet) -> bool:
@@ -501,7 +501,7 @@ class FeatureManager(IFeatureProvider):
                 df = lf
             df.write_parquet(feature_set.checkpoint_path)
             feature_set.last_modified = os.path.getmtime(feature_set.checkpoint_path)
-            self.logger.info(
+            self.logger.debug(
                 f"Checkpoint saved for {feature_set.name} at {feature_set.checkpoint_path}"
             )
         except Exception as e:
@@ -512,7 +512,7 @@ class FeatureManager(IFeatureProvider):
         """Load feature checkpoint if it exists"""
         try:
             if feature_set.checkpoint_path and feature_set.checkpoint_path.exists():
-                self.logger.info(
+                self.logger.debug(
                     f"Loading checkpoint for {feature_set.name} from {feature_set.checkpoint_path}"
                 )
                 return pl.scan_parquet(

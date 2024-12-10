@@ -1,6 +1,5 @@
 from typing import List, Dict
 import polars as pl
-import re
 from farcaster_sybil_detection.features.extractors.base import FeatureExtractor
 from farcaster_sybil_detection.features.config import FeatureConfig
 from farcaster_sybil_detection.data.dataset_loader import DatasetLoader
@@ -92,7 +91,7 @@ class UserIdentityExtractor(FeatureExtractor):
         self, df: pl.LazyFrame, loaded_datasets: Dict[str, pl.LazyFrame]
     ) -> pl.LazyFrame:
         try:
-            self.logger.info("Extracting user identity features...")
+            self.logger.debug("Extracting user identity features...")
 
             # Extract each feature category
             profile_features = self._extract_profile_features(loaded_datasets)
@@ -103,9 +102,9 @@ class UserIdentityExtractor(FeatureExtractor):
             result = df.clone()
             for features in [profile_features, verification_features, storage_features]:
                 if features is not None:
-                    self.logger.info(f"Joining features")
+                    self.logger.debug("Joining features")
                     result = result.join(features, on="fid", how="left")
-                    self.logger.info(f"Joined features")
+                    self.logger.debug("Joined features")
 
             # Calculate derived metrics
             result = self._calculate_derived_metrics(result)

@@ -1,16 +1,8 @@
 import logging
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
-from datetime import datetime
-from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import List, Optional
 
-import numpy as np
 import polars as pl
-import xgboost as xgb
-from lightgbm import LGBMClassifier
-from sklearn.calibration import CalibratedClassifierCV
-from sklearn.ensemble import RandomForestClassifier, VotingClassifier
 
 from farcaster_sybil_detection.config.defaults import Config
 
@@ -42,7 +34,7 @@ class BaseDataLoader(ABC):
     def clear_cache(self):
         """Clear the data cache"""
         self._cached_data = {}
-        self.logger.info("Cache cleared")
+        self.logger.debug("Cache cleared")
 
 
 class BaseFeatureExtractor(ABC):

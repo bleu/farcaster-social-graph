@@ -1,6 +1,5 @@
 import polars as pl
 from farcaster_sybil_detection.config.defaults import Config
-from farcaster_sybil_detection.features.manager import FeatureManager
 from farcaster_sybil_detection.models.config import ModelConfig
 from farcaster_sybil_detection.models.ensemble import OptimizedEnsemble
 from farcaster_sybil_detection.services.predictor import Predictor
@@ -52,10 +51,10 @@ class DetectorService:
             self.model.config.checkpoint_path
             and self.model.config.checkpoint_path.exists()
         ):
-            self.logger.info("Loading existing model from checkpoint.")
+            self.logger.debug("Loading existing model from checkpoint.")
             self.model.load()
         else:
-            self.logger.info(
+            self.logger.debug(
                 "No existing model found. Model will be trained when `train` is called."
             )
 
@@ -64,14 +63,14 @@ class DetectorService:
 
     def train(self, labels_df: pl.DataFrame) -> Dict[str, float]:
         """Train the Sybil detection model"""
-        self.logger.info("Starting training process...")
+        self.logger.debug("Starting training process...")
         metrics = self.trainer.train(labels_df)
-        self.logger.info("Training completed.")
+        self.logger.debug("Training completed.")
         return metrics
 
     def predict(self, identifier: Union[int, str]) -> Dict[str, Any]:
         """Make a prediction for a given FID or fname"""
-        self.logger.info(f"Making prediction for identifier: {identifier}")
+        self.logger.debug(f"Making prediction for identifier: {identifier}")
         result = self.predictor.predict(identifier)
-        self.logger.info("Prediction completed.")
+        self.logger.debug("Prediction completed.")
         return result

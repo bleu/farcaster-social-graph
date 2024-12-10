@@ -97,7 +97,7 @@ class ReputationMetaExtractor(FeatureExtractor):
         self, df: pl.LazyFrame, loaded_datasets: Dict[str, pl.LazyFrame]
     ) -> pl.LazyFrame:
         try:
-            self.logger.info("Extracting reputation meta features...")
+            self.logger.debug("Extracting reputation meta features...")
 
             # Extract each category of features
             core_scores = self._extract_core_scores(loaded_datasets)

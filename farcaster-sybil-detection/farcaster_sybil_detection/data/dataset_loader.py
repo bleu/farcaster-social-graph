@@ -1,10 +1,8 @@
-from dataclasses import dataclass
 from pathlib import Path
 from typing import List, Optional, Dict, Union
 import hashlib
 import json
 import logging
-import os
 
 import polars as pl
 from farcaster_sybil_detection.config.defaults import Config
@@ -105,7 +103,7 @@ class DatasetLoader:
         else:
             lf = pl.scan_parquet(path).select(cols_to_load)
 
-        self.logger.info(f"Loading {name} with columns: {cols_to_load}")
+        self.logger.debug(f"Loading {name} with columns: {cols_to_load}")
 
         # Get filtered size without materializing
         stats = lf.select(
@@ -115,7 +113,7 @@ class DatasetLoader:
             ]
         ).collect()
 
-        self.logger.info(
+        self.logger.debug(
             f"Filtered dataset: {stats[0]['total_records'][0]} records, {stats[0]['unique_fids'][0]} unique FIDs"
         )
 
@@ -133,13 +131,13 @@ class DatasetLoader:
         lf = self.load_lazy_dataset(name, source, columns, fids)
         df = lf.collect()
 
-        self.logger.info(f"Loaded {source}-{name}: {len(df)} records")
+        self.logger.debug(f"Loaded {source}-{name}: {len(df)} records")
         return df
 
     def clear_cache(self):
         """Clear the cache"""
         self._cached_datasets = {}
-        self.logger.info("Cache cleared")
+        self.logger.debug("Cache cleared")
 
     def get_columns(self, name: str, source: str = "farcaster") -> List[str]:
         """Get available columns for a dataset"""

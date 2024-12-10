@@ -82,7 +82,7 @@ class NetworkAnalysisExtractor(FeatureExtractor):
         self, df: pl.LazyFrame, loaded_datasets: Dict[str, pl.LazyFrame]
     ) -> pl.LazyFrame:
         try:
-            self.logger.info("Extracting network analysis features...")
+            self.logger.debug("Extracting network analysis features...")
 
             # Extract each feature category
             basic_metrics = self._extract_basic_metrics(loaded_datasets)

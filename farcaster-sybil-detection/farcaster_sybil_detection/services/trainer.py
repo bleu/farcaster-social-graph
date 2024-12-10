@@ -49,7 +49,7 @@ class Trainer:
             )
 
             # Train model
-            self.logger.info("Training model...")
+            self.logger.debug("Training model...")
             self.model.fit(X_train, y_train, feature_names)
 
             # Save the trained model
@@ -57,9 +57,9 @@ class Trainer:
 
             # Evaluate
             metrics = self._evaluate(X_test, y_test)
-            self.logger.info("\nEvaluation metrics:")
+            self.logger.debug("\nEvaluation metrics:")
             for name, value in metrics.items():
-                self.logger.info(f"{name}: {value:.3f}")
+                self.logger.debug(f"{name}: {value:.3f}")
 
             return metrics
 
@@ -71,14 +71,14 @@ class Trainer:
         self, labels_df: pl.DataFrame
     ) -> Tuple[np.ndarray, np.ndarray, List[str]]:
         """Prepare training data and handle non-numeric columns"""
-        self.logger.info("Building feature matrix...")
+        self.logger.debug("Building feature matrix...")
 
         # Ensure labels DataFrame has correct fid type
         labels_df = labels_df.with_columns([pl.col("fid").cast(pl.Int64)])
 
         # Only get features for fids that have labels
         label_fids = labels_df["fid"].unique().to_list()
-        self.logger.info(f"Preparing features for {len(label_fids)} labeled fids")
+        self.logger.debug(f"Preparing features for {len(label_fids)} labeled fids")
 
         # Build feature matrix only for these fids - ONLY DO THIS ONCE
         matrix = self.feature_manager.build_feature_matrix(target_fids=label_fids)
@@ -88,7 +88,7 @@ class Trainer:
 
         # Join with labels
         data = matrix.join(labels_df, on="fid", how="inner")
-        self.logger.info(f"Initial data shape after joining with labels: {data.shape}")
+        self.logger.debug(f"Initial data shape after joining with labels: {data.shape}")
 
         # Identify non-numeric columns to drop
         columns_to_drop = ["fid"]  # Always drop fid
@@ -105,7 +105,7 @@ class Trainer:
                     columns_to_drop.append(col)
 
         if columns_to_drop:
-            self.logger.info(f"Dropping non-numeric columns: {columns_to_drop}")
+            self.logger.debug(f"Dropping non-numeric columns: {columns_to_drop}")
 
         # Handle missing values before converting to numpy
         numeric_data = data.drop(columns_to_drop)
@@ -154,8 +154,8 @@ class Trainer:
             self.logger.warning("Replacing remaining non-finite values")
             X = np.nan_to_num(X, nan=0.0, posinf=1e9, neginf=-1e9)
 
-        self.logger.info(f"Final feature matrix shape: {X.shape}")
-        self.logger.info(f"Number of features: {len(feature_names)}")
+        self.logger.debug(f"Final feature matrix shape: {X.shape}")
+        self.logger.debug(f"Number of features: {len(feature_names)}")
         return X, y, feature_names
 
     def _validate_data(self, X: np.ndarray, y: np.ndarray, feature_names: List[str]):
@@ -175,9 +175,9 @@ class Trainer:
 
         # Check label distribution
         unique_labels, label_counts = np.unique(y, return_counts=True)
-        self.logger.info("Label distribution:")
+        self.logger.debug("Label distribution:")
         for label, count in zip(unique_labels, label_counts):
-            self.logger.info(f"  Class {label}: {count} ({count/len(y)*100:.2f}%)")
+            self.logger.debug(f"  Class {label}: {count} ({count/len(y)*100:.2f}%)")
 
         # Log feature statistics
         feature_stats = {

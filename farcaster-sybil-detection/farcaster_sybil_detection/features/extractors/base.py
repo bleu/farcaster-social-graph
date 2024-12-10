@@ -35,7 +35,7 @@ class FeatureExtractor(ABC):
         Maintains lazy evaluation throughout.
         """
         try:
-            self.logger.info(f"Starting feature extraction: {self.__class__.__name__}")
+            self.logger.debug(f"Starting feature extraction: {self.__class__.__name__}")
 
             # Create initial lazy frame if needed
             if input_lf is None:
@@ -44,7 +44,7 @@ class FeatureExtractor(ABC):
                         "Both input LazyFrame and target_fids are None. Skipping feature extraction."
                     )
                     return None
-                self.logger.info(
+                self.logger.debug(
                     f"Creating initial LazyFrame with {len(target_fids)} target FIDs"
                 )
                 input_lf = pl.DataFrame({"fid": target_fids}).lazy()
@@ -75,7 +75,9 @@ class FeatureExtractor(ABC):
 
             # Post-process while maintaining lazy evaluation
             features_lf = self.post_process(features_lf)
-            self.logger.info(f"Completed feature extraction: {self.__class__.__name__}")
+            self.logger.debug(
+                f"Completed feature extraction: {self.__class__.__name__}"
+            )
             return features_lf
 
         except Exception as e:
@@ -104,7 +106,7 @@ class FeatureExtractor(ABC):
             error_msg = f"Missing required columns: {missing}"
             self.logger.error(error_msg)
             raise ValueError(error_msg)
-        self.logger.info("Input validation passed.")
+        self.logger.debug("Input validation passed.")
 
     @abstractmethod
     def get_dependencies(self) -> List[str]:
@@ -136,11 +138,11 @@ class FeatureExtractor(ABC):
             columns = params.get("columns")
             source = params.get("source", "farcaster")
 
-            self.logger.info(f"Loading dataset '{name}' from source '{source}'")
+            self.logger.debug(f"Loading dataset '{name}' from source '{source}'")
             if columns:
-                self.logger.info(f"Required columns: {columns}")
+                self.logger.debug(f"Required columns: {columns}")
             if target_fids:
-                self.logger.info(f"Filtering for {len(target_fids)} FIDs")
+                self.logger.debug(f"Filtering for {len(target_fids)} FIDs")
 
             # Load dataset lazily
             dataset_lf = self.data_loader.load_lazy_dataset(
@@ -185,11 +187,11 @@ class FeatureExtractor(ABC):
         - Fill missing values with zeros
         - Convert non-numeric columns to numeric where applicable
         """
-        self.logger.info("Starting post-processing...")
+        self.logger.debug("Starting post-processing...")
         lf = self._ensure_fid_type(lf)
         lf = self._ensure_unique_fid(lf)
         lf = self._ensure_no_nulls(lf)
-        self.logger.info(
+        self.logger.debug(
             "Post-processing completed: cast 'fid', ensure uniqueness, fill nulls, and convert to numeric."
         )
         return lf

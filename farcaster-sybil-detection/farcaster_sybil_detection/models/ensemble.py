@@ -94,10 +94,10 @@ class OptimizedEnsemble(BaseModel):
         self.feature_names = feature_names or []
         cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
 
-        self.logger.info(f"Input shape: {X.shape}")
-        self.logger.info("Feature stats before scaling:")
-        self.logger.info(f"  Mean: {np.mean(X, axis=0)[:5]}...")
-        self.logger.info(f"  Std: {np.std(X, axis=0)[:5]}...")
+        self.logger.debug(f"Input shape: {X.shape}")
+        self.logger.debug("Feature stats before scaling:")
+        self.logger.debug(f"  Mean: {np.mean(X, axis=0)[:5]}...")
+        self.logger.debug(f"  Std: {np.std(X, axis=0)[:5]}...")
 
         # Initialize base models
         base_models = {
@@ -116,7 +116,7 @@ class OptimizedEnsemble(BaseModel):
 
         # Train and calibrate base models
         for name, model in base_models.items():
-            self.logger.info(f"Optimizing {name}...")
+            self.logger.debug(f"Optimizing {name}...")
             study = optuna.create_study(
                 direction="maximize", study_name=f"optuna_{name}"
             )
@@ -147,7 +147,7 @@ class OptimizedEnsemble(BaseModel):
             calibrated.fit(X, y)
             self.calibrated_models[name] = calibrated
 
-            self.logger.info(f"{name} best score: {study.best_value:.4f}")
+            self.logger.debug(f"{name} best score: {study.best_value:.4f}")
 
         # Create final ensemble with equal weights
         self.model = VotingClassifier(
@@ -163,7 +163,7 @@ class OptimizedEnsemble(BaseModel):
 
         # Evaluate stability
         final_predictions, unstable_indices = self.predict_with_stability(X)
-        self.logger.info(f"Number of unstable predictions: {len(unstable_indices)}")
+        self.logger.debug(f"Number of unstable predictions: {len(unstable_indices)}")
 
     def predict_with_stability(self, X: np.ndarray) -> Tuple[np.ndarray, List[int]]:
         """Make predictions with stability assessment
@@ -282,7 +282,7 @@ class OptimizedEnsemble(BaseModel):
 
     def _optimize_weights(self, X: np.ndarray, y: np.ndarray) -> List[float]:
         """Optimize ensemble weights using scipy minimize"""
-        self.logger.info("Optimizing ensemble weights...")
+        self.logger.debug("Optimizing ensemble weights...")
         from scipy.optimize import minimize
 
         def objective(weights):
@@ -323,7 +323,7 @@ class OptimizedEnsemble(BaseModel):
 
         if result.success:
             optimized_weights = result.x / np.sum(result.x)
-            self.logger.info(f"Optimized weights: {optimized_weights}")
+            self.logger.debug(f"Optimized weights: {optimized_weights}")
             return optimized_weights.tolist()
         else:
             self.logger.warning("Weight optimization failed. Using equal weights.")
@@ -475,10 +475,10 @@ class OptimizedEnsemble(BaseModel):
             f for f, imp in importance.items() if imp > threshold * max_importance
         ]
 
-        self.logger.info(
+        self.logger.debug(
             f"\nSelected {len(selected_features)}/{len(self.feature_names)} features"
         )
-        self.logger.info(
+        self.logger.debug(
             "Top 10 features: %s",
             sorted(importance.items(), key=lambda x: x[1], reverse=True)[:10],
         )

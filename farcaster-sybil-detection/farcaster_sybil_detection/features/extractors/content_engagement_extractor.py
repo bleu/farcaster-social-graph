@@ -120,7 +120,7 @@ class ContentEngagementExtractor(FeatureExtractor):
         self, df: pl.LazyFrame, loaded_datasets: Dict[str, pl.LazyFrame]
     ) -> pl.LazyFrame:
         try:
-            self.logger.info("Extracting content engagement features...")
+            self.logger.debug("Extracting content engagement features...")
 
             # Extract each feature category
             content_metrics = self._extract_content_metrics(loaded_datasets)
@@ -193,8 +193,8 @@ class ContentEngagementExtractor(FeatureExtractor):
             .with_columns(
                 [
                     pl.col("mentions")
-                    .fill_null("[]")
                     .str.json_decode()
+                    .fill_null("[]")
                     .list.len()
                     .alias("mention_count"),
                     pl.col("text")
@@ -424,7 +424,7 @@ class ContentEngagementExtractor(FeatureExtractor):
             return pl.DataFrame({"fid": []}).lazy()
 
         # First let's check the schema of our input
-        self.logger.info(f"Input casts schema: {casts.schema}")
+        self.logger.debug(f"Input casts schema: {casts.schema}")
 
         # Try each metric separately to identify which one causes the error
         try:
@@ -488,7 +488,7 @@ class ContentEngagementExtractor(FeatureExtractor):
                 )
             )
 
-            self.logger.info(f"Final quality metrics schema: {result.schema}")
+            self.logger.debug(f"Final quality metrics schema: {result.schema}")
             return result
 
         except Exception as e:
