@@ -1,15 +1,14 @@
 from typing import List, Dict
 import polars as pl
 from farcaster_sybil_detection.features.extractors.base import FeatureExtractor
-from farcaster_sybil_detection.features.config import FeatureConfig
 from farcaster_sybil_detection.data.dataset_loader import DatasetLoader
 
 
 class ReputationMetaExtractor(FeatureExtractor):
     """Reputation scores and derived meta features"""
 
-    def __init__(self, config: FeatureConfig, data_loader: DatasetLoader):
-        super().__init__(config, data_loader)
+    def __init__(self, data_loader: DatasetLoader):
+        super().__init__(data_loader)
         self.feature_names = [
             # Core reputation scores
             # "authenticity_score",

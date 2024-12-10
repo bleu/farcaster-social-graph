@@ -1,10 +1,8 @@
 from abc import ABC, abstractmethod
-from typing import Dict, List, Optional, Any, Tuple
+from typing import Dict, List
 from farcaster_sybil_detection.models.config import ModelConfig
 import numpy as np
-from dataclasses import dataclass
 import joblib
-from pathlib import Path
 
 
 class BaseModel(ABC):

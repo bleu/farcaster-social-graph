@@ -1,15 +1,14 @@
 from typing import List, Dict
 import polars as pl
 from farcaster_sybil_detection.features.extractors.base import FeatureExtractor
-from farcaster_sybil_detection.features.config import FeatureConfig
 from farcaster_sybil_detection.data.dataset_loader import DatasetLoader
 
 
 class NetworkAnalysisExtractor(FeatureExtractor):
     """Comprehensive network analysis including basic and advanced metrics"""
 
-    def __init__(self, config: FeatureConfig, data_loader: DatasetLoader):
-        super().__init__(config, data_loader)
+    def __init__(self, data_loader: DatasetLoader):
+        super().__init__(data_loader)
         self.feature_names = [
             # Basic network metrics
             "follow_ratio",

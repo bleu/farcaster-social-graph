@@ -1,15 +1,14 @@
 from typing import List, Dict
 import polars as pl
 from farcaster_sybil_detection.features.extractors.base import FeatureExtractor
-from farcaster_sybil_detection.features.config import FeatureConfig
 from farcaster_sybil_detection.data.dataset_loader import DatasetLoader
 
 
 class UserIdentityExtractor(FeatureExtractor):
     """Core user identity features including profile, verification, and storage"""
 
-    def __init__(self, config: FeatureConfig, data_loader: DatasetLoader):
-        super().__init__(config, data_loader)
+    def __init__(self, data_loader: DatasetLoader):
+        super().__init__(data_loader)
         self.feature_names = [
             # Profile basics
             "has_ens",

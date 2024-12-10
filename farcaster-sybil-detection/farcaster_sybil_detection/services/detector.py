@@ -42,7 +42,6 @@ class DetectorService:
             name="sybil_detector",
             params={},
             checkpoint_path=self.config.model_dir / "model.pkl",
-            confidence_thresholds=self.config.confidence_thresholds,
         )
         self.model = OptimizedEnsemble(model_config)
 

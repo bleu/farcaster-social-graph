@@ -61,21 +61,14 @@ class FeatureManager(IFeatureProvider):
 
     def _initialize_extractors(self) -> Dict[str, FeatureExtractor]:
         """Initialize all feature extractors"""
-        feature_config = self.config.feature_config
         return {
             # new features
-            "user_identity": UserIdentityExtractor(feature_config, self.data_loader),
-            "temporal_behavior": TemporalBehaviorExtractor(
-                feature_config, self.data_loader
-            ),
-            "network_analysis": NetworkAnalysisExtractor(
-                feature_config, self.data_loader
-            ),
-            "content_engagement": ContentEngagementExtractor(
-                feature_config, self.data_loader
-            ),
+            "user_identity": UserIdentityExtractor(self.data_loader),
+            "temporal_behavior": TemporalBehaviorExtractor(self.data_loader),
+            "network_analysis": NetworkAnalysisExtractor(self.data_loader),
+            "content_engagement": ContentEngagementExtractor(self.data_loader),
             # "reputation_meta": ReputationMetaExtractor(
-            #     feature_config, self.data_loader
+            #     self.data_loader
             # ),
         }
 
@@ -125,82 +118,6 @@ class FeatureManager(IFeatureProvider):
 
         except Exception as e:
             self.logger.error(f"Error joining {feature_name}: {e}")
-            raise
-
-    def old_safe_join_features(
-        self, df: Optional[pl.DataFrame], new_features: pl.DataFrame, feature_name: str
-    ) -> pl.DataFrame:
-        """Enhanced safe join features with comprehensive null and list handling"""
-        try:
-            # Handle first feature set
-            if df is None or df.is_empty():
-                self.logger.debug(f"Starting new feature matrix with {feature_name}")
-                return new_features
-
-            if new_features is None or new_features.is_empty():
-                self.logger.warning(f"No valid features to join for {feature_name}")
-                return df
-
-            # Verify FID columns
-            if "fid" not in df.columns:
-                raise ValueError("Base DataFrame missing fid column")
-            if "fid" not in new_features.columns:
-                raise ValueError(f"New features missing fid column for {feature_name}")
-
-            df = df.with_columns([pl.col("fid").cast(pl.Int64)])
-            new_features = new_features.with_columns([pl.col("fid").cast(pl.Int64)])
-
-            # Get new columns
-            existing_cols = set(df.columns)
-            new_cols = [
-                c for c in new_features.columns if c != "fid" and c not in existing_cols
-            ]
-
-            if not new_cols:
-                self.logger.warning(f"No new columns to add from {feature_name}")
-                return df
-
-            # Handle nulls in new features before join
-            safe_features = new_features.clone()
-            for col in new_cols:
-                dtype_str = str(new_features[col].dtype).lower()
-                if "list" in dtype_str:
-                    # For list columns, replace null with empty list
-                    safe_features = safe_features.with_columns(
-                        pl.col(col).fill_null([])
-                    )
-                elif self._is_numeric_dtype(new_features[col].dtype):
-                    # For numeric columns, fill null with 0
-                    safe_features = safe_features.with_columns(
-                        pl.col(col).fill_null(0.0)
-                    )
-
-            # Join with guaranteed FID type consistency
-            self.logger.debug(f"Joining features from {feature_name}: {new_cols}")
-            self.logger.debug(f"Existing columns: {df.columns}")
-            self.logger.debug(f"New columns: {new_features.columns}")
-            self.logger.debug(f"Safe features columns: {safe_features.columns}")
-            safe_features = safe_features.unique(subset=["fid"])
-            result = df.join(
-                safe_features.select(["fid"] + new_cols).with_columns(
-                    pl.col("fid").cast(pl.Int64)
-                ),
-                on="fid",
-                how="left",
-            )
-
-            # Handle any new nulls that appeared after join
-            for col in new_cols:
-                dtype_str = str(result[col].dtype).lower()
-                if "list" in dtype_str:
-                    result = result.with_columns(pl.col(col).fill_null([]))
-                elif self._is_numeric_dtype(result[col].dtype):
-                    result = result.with_columns(pl.col(col).fill_null(0.0))
-
-            return result
-
-        except Exception as e:
-            self.logger.error(f"Error joining {feature_name}: {str(e)}")
             raise
 
     def _log_memory(self, message: str):

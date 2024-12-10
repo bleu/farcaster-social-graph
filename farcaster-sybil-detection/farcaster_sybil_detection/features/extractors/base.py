@@ -4,15 +4,13 @@ from abc import ABC, abstractmethod
 from typing import List, Dict, Optional
 import polars as pl
 import logging
-from farcaster_sybil_detection.features.config import FeatureConfig
 from farcaster_sybil_detection.data.dataset_loader import DatasetLoader
 
 
 class FeatureExtractor(ABC):
     """Abstract base class for all feature extractors."""
 
-    def __init__(self, config: FeatureConfig, data_loader: DatasetLoader):
-        self.config = config
+    def __init__(self, data_loader: DatasetLoader):
         self.data_loader = data_loader
         self.logger = logging.getLogger(self.__class__.__name__)
         self.logger.setLevel(logging.INFO)
