@@ -1,7 +1,6 @@
-from typing import List, Dict
+from typing import Dict
 import polars as pl
 from farcaster_sybil_detection.features.extractors.base import FeatureExtractor
-from farcaster_sybil_detection.features.config import FeatureConfig
 from farcaster_sybil_detection.data.dataset_loader import DatasetLoader
 
 
@@ -17,9 +16,13 @@ def validate_fid_schema(df: pl.LazyFrame, extractor_name: str):
 class TemporalBehaviorExtractor(FeatureExtractor):
     """Temporal patterns and behavioral analysis"""
 
-    def __init__(self, config: FeatureConfig, data_loader: DatasetLoader):
-        super().__init__(config, data_loader)
-        self.feature_names = [
+    def __init__(self, data_loader: DatasetLoader):
+        super().__init__(data_loader)
+        self.feature_names = self.get_feature_names()
+
+    @classmethod
+    def get_feature_names(cls):
+        return [
             # Activity timing
             "hour_diversity",
             "weekday_diversity",
@@ -67,9 +70,6 @@ class TemporalBehaviorExtractor(FeatureExtractor):
             "cross_channel_activity",
             "multi_channel_ratio",
         ]
-
-    def get_dependencies(self) -> List[str]:
-        return []
 
     def get_required_datasets(self) -> Dict[str, Dict]:
         return {

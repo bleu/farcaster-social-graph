@@ -1,19 +1,47 @@
-from abc import ABC, abstractmethod
-from typing import Dict, List, Optional, Any, Tuple
-from farcaster_sybil_detection.models.config import ModelConfig
+from abc import abstractmethod
+from typing import List
+from farcaster_sybil_detection.utils.with_logging import LoggedABC, add_logging
 import numpy as np
-from dataclasses import dataclass
 import joblib
-from pathlib import Path
 
 
-class BaseModel(ABC):
+class IModel(LoggedABC):
+    """Base model interface"""
+
+    @abstractmethod
+    def fit(self, X: np.ndarray, y: np.ndarray, feature_names: List[str]) -> None:
+        """Train the model"""
+        pass
+
+    @abstractmethod
+    def predict(self, X: np.ndarray) -> np.ndarray:
+        """Make predictions"""
+        pass
+
+    @abstractmethod
+    def predict_proba(self, X: np.ndarray) -> np.ndarray:
+        """Get probability predictions"""
+        pass
+
+    @abstractmethod
+    def save(self) -> None:
+        """Save model to disk"""
+        pass
+
+    @abstractmethod
+    def load(self) -> None:
+        """Load model from disk"""
+        pass
+
+
+@add_logging
+class BaseModel(IModel):
     """Base class for all models"""
 
-    def __init__(self, config: ModelConfig):
-        self.config = config
+    def __init__(self, checkpoint_path: str):
         self.model = None
         self.feature_names: List[str] = []
+        self.checkpoint_path = checkpoint_path
 
     @abstractmethod
     def fit(self, X: np.ndarray, y: np.ndarray, feature_names: List[str]) -> None:
@@ -35,25 +63,18 @@ class BaseModel(ABC):
         """Get confidence score for prediction"""
         pass
 
-    @abstractmethod
-    def explain_prediction(self, instance: np.ndarray) -> Dict[str, float]:
-        """Get SHAP explanations for predictions"""
-        pass
-
     def save(self) -> None:
         """Save model checkpoint"""
         model_data = {
             "model": self.model,
             "feature_names": self.feature_names,  # Save feature names
-            "config": self.config,
         }
-        if self.config.checkpoint_path:
-            joblib.dump(model_data, self.config.checkpoint_path)
+        if self.checkpoint_path:
+            joblib.dump(model_data, self.checkpoint_path)
 
     def load(self) -> None:
         """Load model checkpoint"""
-        if self.config.checkpoint_path and self.config.checkpoint_path.exists():
-            model_data = joblib.load(self.config.checkpoint_path)
+        if self.checkpoint_path and self.checkpoint_path.exists():
+            model_data = joblib.load(self.checkpoint_path)
             self.model = model_data["model"]
             self.feature_names = model_data.get("feature_names", [])
-            self.config = model_data["config"]

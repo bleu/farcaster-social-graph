@@ -1,56 +1,35 @@
+from farcaster_sybil_detection.utils.with_logging import LoggedABC, add_logging
 import polars as pl
 from farcaster_sybil_detection.config.defaults import Config
-from farcaster_sybil_detection.models.config import ModelConfig
 from farcaster_sybil_detection.models.ensemble import OptimizedEnsemble
 from farcaster_sybil_detection.services.predictor import Predictor
 from farcaster_sybil_detection.services.trainer import Trainer
-from farcaster_sybil_detection.features.interface import IFeatureProvider
-from typing import Any, Dict, Optional, Union
-import logging
+from typing import Any, Dict, Union
+from farcaster_sybil_detection.features.registry import FeatureRegistry
+from farcaster_sybil_detection.features.manager import FeatureManager
 
 
-class DetectorService:
+@add_logging
+class DetectorService(LoggedABC):
     """Service layer for Sybil detection"""
 
-    def __init__(
-        self, config: Config, feature_manager: Optional[IFeatureProvider] = None
-    ):
+    def __init__(self, config: Config, registry: FeatureRegistry):
         self.config = config
-        self._setup_logging()
-        self._setup_components(feature_manager)
 
-    def _setup_logging(self):
-        """Setup logging for DetectorService"""
-        self.logger = logging.getLogger(self.__class__.__name__)
-        self.logger.setLevel(logging.INFO)
-        if not self.logger.handlers:
-            ch = logging.StreamHandler()
-            ch.setLevel(logging.INFO)
-            formatter = logging.Formatter(
-                "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-            )
-            ch.setFormatter(formatter)
-            self.logger.addHandler(ch)
+        self._setup_components(registry)
 
-    def _setup_components(self, feature_manager: Optional[IFeatureProvider]):
+    def _setup_components(self, registry: FeatureRegistry):
         """Initialize system components"""
-        if feature_manager is None:
-            self.logger.error("FeatureProvider cannot be None")
-            raise ValueError("FeatureProvider must be provided")
-        self.feature_manager = feature_manager
-        model_config = ModelConfig(
-            name="sybil_detector",
-            params={},
-            checkpoint_path=self.config.model_dir / "model.pkl",
-            confidence_thresholds=self.config.confidence_thresholds,
+        self.feature_manager = FeatureManager(self.config, registry)
+
+        self.model = OptimizedEnsemble(
+            self.config.model_dir / "model.pkl",
         )
-        self.model = OptimizedEnsemble(model_config)
 
         # Check if model checkpoint exists
-        if (
-            self.model.config.checkpoint_path
-            and self.model.config.checkpoint_path.exists()
-        ):
+        if (self.config.model_dir / "model.pkl") and (
+            self.config.model_dir / "model.pkl"
+        ).exists():
             self.logger.debug("Loading existing model from checkpoint.")
             self.model.load()
         else:

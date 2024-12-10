@@ -1,4 +1,5 @@
 from typing import Dict, List, Optional
+from farcaster_sybil_detection.utils.with_logging import add_logging
 import polars as pl
 from sklearn.ensemble import IsolationForest
 from sklearn.preprocessing import StandardScaler
@@ -6,6 +7,7 @@ import numpy as np
 from farcaster_sybil_detection.evaluation.segmentation import UserSegmentation
 
 
+@add_logging
 class LabelingSampler:
     """Handle sampling for labeling with anomaly detection"""
 

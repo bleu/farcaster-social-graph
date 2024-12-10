@@ -1,6 +1,6 @@
 from typing import Dict, List, Tuple
-import logging
 from farcaster_sybil_detection.features.interface import IFeatureProvider
+from farcaster_sybil_detection.utils.with_logging import LoggedABC, add_logging
 import polars as pl
 import numpy as np
 from sklearn.model_selection import train_test_split
@@ -10,7 +10,8 @@ from ..models.base import BaseModel
 from ..evaluation.metrics import EvaluationMetrics
 
 
-class Trainer:
+@add_logging
+class Trainer(LoggedABC):
     """Handles model training and evaluation"""
 
     def __init__(
@@ -19,19 +20,6 @@ class Trainer:
         self.config = config
         self.model = model
         self.feature_manager = feature_manager
-        self._setup_logging()
-
-    def _setup_logging(self):
-        self.logger = logging.getLogger(self.__class__.__name__)
-        self.logger.setLevel(logging.INFO)
-        if not self.logger.handlers:
-            ch = logging.StreamHandler()
-            ch.setLevel(logging.INFO)
-            formatter = logging.Formatter(
-                "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-            )
-            ch.setFormatter(formatter)
-            self.logger.addHandler(ch)
 
     def train(
         self, labels_df: pl.DataFrame, test_size: float = 0.2, random_state: int = 42

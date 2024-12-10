@@ -1,11 +1,12 @@
 from typing import Optional, List
+from farcaster_sybil_detection.utils.with_logging import LoggedABC
 import polars as pl
-from abc import ABC, abstractmethod
+from abc import abstractmethod
 
 from farcaster_sybil_detection.data.dataset_loader import DatasetLoader
 
 
-class IFeatureProvider(ABC):
+class IFeatureProvider(LoggedABC):
     """Interface for feature access"""
 
     def __init__(self):

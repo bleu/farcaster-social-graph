@@ -1,13 +1,14 @@
+from farcaster_sybil_detection.utils.with_logging import LoggedABC, add_logging
 import numpy as np
 import polars as pl
 from farcaster_sybil_detection.features.manager import FeatureManager
 from farcaster_sybil_detection.models.base import BaseModel
 from farcaster_sybil_detection.config.defaults import Config
 from typing import Any, Dict, Optional, Union, Tuple
-import logging
 
 
-class Predictor:
+@add_logging
+class Predictor(LoggedABC):
     """Handles predictions with separate feature matrix and ID resolution"""
 
     def __init__(
@@ -16,21 +17,8 @@ class Predictor:
         self.config = config
         self.model = model
         self.feature_manager = feature_manager
-        self._setup_logging()
         # Cache for FID-fname mapping
         self._id_mapping: Optional[pl.DataFrame] = None
-
-    def _setup_logging(self):
-        self.logger = logging.getLogger(self.__class__.__name__)
-        self.logger.setLevel(logging.INFO)
-        if not self.logger.handlers:
-            ch = logging.StreamHandler()
-            ch.setLevel(logging.INFO)
-            formatter = logging.Formatter(
-                "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-            )
-            ch.setFormatter(formatter)
-            self.logger.addHandler(ch)
 
     def _load_id_mapping(self) -> pl.DataFrame:
         """Load or retrieve cached ID mapping"""

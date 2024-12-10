@@ -1,30 +1,26 @@
 # farcaster_sybil_detection/features/extractors/base.py
 
-from abc import ABC, abstractmethod
+from abc import abstractmethod
 from typing import List, Dict, Optional
+from farcaster_sybil_detection.utils.with_logging import LoggedABC, add_logging
 import polars as pl
-import logging
-from farcaster_sybil_detection.features.config import FeatureConfig
 from farcaster_sybil_detection.data.dataset_loader import DatasetLoader
 
 
-class FeatureExtractor(ABC):
-    """Abstract base class for all feature extractors."""
+class BaseFeatureExtractor(LoggedABC):
+    """Base feature extractor interface"""
 
-    def __init__(self, config: FeatureConfig, data_loader: DatasetLoader):
-        self.config = config
+    @abstractmethod
+    def get_required_datasets(self) -> Dict[str, Dict]:
+        pass
+
+
+@add_logging
+class FeatureExtractor(BaseFeatureExtractor):
+    """Abstract base class for all feature extractors. Implements Template Method pattern."""
+
+    def __init__(self, data_loader: DatasetLoader):
         self.data_loader = data_loader
-        self.logger = logging.getLogger(self.__class__.__name__)
-        self.logger.setLevel(logging.INFO)
-        if not self.logger.handlers:
-            ch = logging.StreamHandler()
-            ch.setLevel(logging.INFO)
-            formatter = logging.Formatter(
-                "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-            )
-            ch.setFormatter(formatter)
-            self.logger.addHandler(ch)
-
         self.feature_names: List[str] = []
 
     def run(
@@ -107,14 +103,6 @@ class FeatureExtractor(ABC):
             self.logger.error(error_msg)
             raise ValueError(error_msg)
         self.logger.debug("Input validation passed.")
-
-    @abstractmethod
-    def get_dependencies(self) -> List[str]:
-        """
-        Abstract method to list required input columns.
-        Must return a list of strings representing column names.
-        """
-        pass
 
     @abstractmethod
     def get_required_datasets(self) -> Dict[str, Dict]:
