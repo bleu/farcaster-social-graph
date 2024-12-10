@@ -1,4 +1,3 @@
-from sklearn.preprocessing import StandardScaler
 from typing import Dict, List, Tuple
 import logging
 from farcaster_sybil_detection.features.interface import IFeatureProvider
@@ -8,7 +7,6 @@ from sklearn.model_selection import train_test_split
 
 from ..config.defaults import Config
 from ..models.base import BaseModel
-from ..features.manager import FeatureManager
 from ..evaluation.metrics import EvaluationMetrics
 
 
@@ -158,9 +156,7 @@ class Trainer:
 
         self.logger.info(f"Final feature matrix shape: {X.shape}")
         self.logger.info(f"Number of features: {len(feature_names)}")
-
-        X_scaled = StandardScaler().fit_transform(X)
-        return X_scaled, y, feature_names
+        return X, y, feature_names
 
     def _validate_data(self, X: np.ndarray, y: np.ndarray, feature_names: List[str]):
         """Validate data before training"""

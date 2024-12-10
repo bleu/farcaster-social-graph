@@ -1,7 +1,5 @@
 from typing import List, Dict
 import polars as pl
-import re
-import numpy as np
 from farcaster_sybil_detection.features.extractors.base import FeatureExtractor
 from farcaster_sybil_detection.features.config import FeatureConfig
 from farcaster_sybil_detection.data.dataset_loader import DatasetLoader
@@ -66,6 +64,20 @@ class ContentEngagementExtractor(FeatureExtractor):
             # "content_sustainability",
             # "audience_retention",
             # "content_effectiveness",
+            "casts_with_mentions",
+            # "total_mentions",
+            "avg_mentions_per_cast",
+            "mention_frequency",
+            # "mention_ratio",
+            "template_usage_ratio",
+            "urgency_ratio",
+            "emoji_spam_ratio",
+            "price_mention_ratio",
+            "symbol_spam_ratio",
+            "airdrop_term_ratio",
+            "parent_fid_diversity",
+            "root_thread_participation",
+            "embed_usage_ratio",
         ]
 
     def get_dependencies(self) -> List[str]:
@@ -76,12 +88,15 @@ class ContentEngagementExtractor(FeatureExtractor):
             "casts": {
                 "columns": [
                     "fid",
-                    "text",
-                    "parent_hash",
-                    "mentions",
-                    "deleted_at",
                     "timestamp",
+                    "deleted_at",
+                    "text",
+                    "parent_url",
+                    "parent_hash",
+                    "parent_fid",
                     "embeds",
+                    "mentions",
+                    "root_parent_hash",
                 ],
                 "source": "farcaster",
             },
@@ -113,6 +128,8 @@ class ContentEngagementExtractor(FeatureExtractor):
             conversation_metrics = self._extract_conversation_metrics(loaded_datasets)
             quality_metrics = self._extract_quality_metrics(loaded_datasets)
             spam_metrics = self._extract_spam_metrics(loaded_datasets)
+            mention_metrics = self._extract_mention_metrics(loaded_datasets)
+            thread_metrics = self._extract_thread_metrics(loaded_datasets)
             # advanced_metrics = self._extract_advanced_metrics(loaded_datasets)
 
             # Combine all features
@@ -123,6 +140,8 @@ class ContentEngagementExtractor(FeatureExtractor):
                 conversation_metrics,
                 quality_metrics,
                 spam_metrics,
+                mention_metrics,
+                thread_metrics,
                 # advanced_metrics,
             ]:
                 if metrics is not None:
@@ -133,6 +152,85 @@ class ContentEngagementExtractor(FeatureExtractor):
         except Exception as e:
             self.logger.error(f"Error extracting content engagement features: {e}")
             raise
+
+    def _extract_thread_metrics(
+        self, loaded_datasets: Dict[str, pl.LazyFrame]
+    ) -> pl.LazyFrame:
+        casts = loaded_datasets.get("casts")
+        if casts is None:
+            return pl.DataFrame({"fid": []}).lazy()
+
+        return (
+            casts.filter(pl.col("deleted_at").is_null())
+            .with_columns(
+                [
+                    pl.col("parent_fid").is_not_null().alias("has_parent"),
+                    pl.col("root_parent_hash").is_not_null().alias("in_thread"),
+                    pl.col("embeds").is_not_null().alias("has_embed"),
+                ]
+            )
+            .group_by("fid")
+            .agg(
+                [
+                    pl.n_unique("parent_fid").alias("parent_fid_diversity"),
+                    (pl.col("in_thread").sum() / pl.len()).alias(
+                        "root_thread_participation"
+                    ),
+                    (pl.col("has_embed").sum() / pl.len()).alias("embed_usage_ratio"),
+                ]
+            )
+        )
+
+    def _extract_mention_metrics(
+        self, loaded_datasets: Dict[str, pl.LazyFrame]
+    ) -> pl.LazyFrame:
+        casts = loaded_datasets.get("casts")
+        if casts is None:
+            return pl.DataFrame({"fid": []}).lazy()
+
+        return (
+            casts.filter(pl.col("deleted_at").is_null())
+            .with_columns(
+                [
+                    pl.col("mentions")
+                    .str.json_decode()
+                    .list.len()
+                    .alias("mention_count"),
+                    pl.col("text")
+                    .str.contains(r"\[.*?\]|\{.*?\}|\<.*?\>")
+                    .alias("has_template"),
+                    pl.col("text")
+                    .str.contains(r"\b(hurry|limited|fast|quick|soon|ending)\b")
+                    .alias("has_urgency"),
+                    pl.col("text")
+                    .str.contains(r"[\U0001F300-\U0001F9FF]{5,}")
+                    .alias("has_emoji_spam"),
+                    pl.col("text").str.contains(r"\$\d+|\d+\$").alias("has_price"),
+                    pl.col("text").str.contains(r"[_.\-]{2,}").alias("has_symbol_spam"),
+                    pl.col("text")
+                    .str.contains(r"(?i)\b(airdrop|farm|degen|wojak)\b")
+                    .alias("has_airdrop"),
+                ]
+            )
+            .group_by("fid")
+            .agg(
+                [
+                    # pl.col("mention_count").sum().alias("total_mentions"),
+                    pl.col("mention_count").mean().alias("avg_mentions_per_cast"),
+                    (pl.col("mention_count") > 0).sum().alias("casts_with_mentions"),
+                    ((pl.col("mention_count") > 0).sum() / pl.len()).alias(
+                        "mention_frequency"
+                    ),
+                    # (pl.col("total_mentions") / pl.len()).alias("mention_ratio"),
+                    pl.col("has_template").mean().alias("template_usage_ratio"),
+                    pl.col("has_urgency").mean().alias("urgency_ratio"),
+                    pl.col("has_emoji_spam").mean().alias("emoji_spam_ratio"),
+                    pl.col("has_price").mean().alias("price_mention_ratio"),
+                    pl.col("has_symbol_spam").mean().alias("symbol_spam_ratio"),
+                    pl.col("has_airdrop").mean().alias("airdrop_term_ratio"),
+                ]
+            )
+        )
 
     def _extract_content_metrics(
         self, loaded_datasets: Dict[str, pl.LazyFrame]

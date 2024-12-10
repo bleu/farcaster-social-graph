@@ -1,6 +1,5 @@
 from typing import List, Dict
 import polars as pl
-import numpy as np
 from farcaster_sybil_detection.features.extractors.base import FeatureExtractor
 from farcaster_sybil_detection.features.config import FeatureConfig
 from farcaster_sybil_detection.data.dataset_loader import DatasetLoader
@@ -63,6 +62,10 @@ class TemporalBehaviorExtractor(FeatureExtractor):
             "trend_stability",
             # "temporal_novelty",
             "adaptation_rate",
+            # missing
+            "avg_follow_latency_seconds",
+            "cross_channel_activity",
+            "multi_channel_ratio",
         ]
 
     def get_dependencies(self) -> List[str]:
@@ -71,7 +74,18 @@ class TemporalBehaviorExtractor(FeatureExtractor):
     def get_required_datasets(self) -> Dict[str, Dict]:
         return {
             "casts": {
-                "columns": ["fid", "timestamp", "deleted_at", "text"],
+                "columns": [
+                    "fid",
+                    "timestamp",
+                    "deleted_at",
+                    "text",
+                    "parent_url",
+                    "parent_hash",
+                    "parent_fid",
+                    "embeds",
+                    "mentions",
+                    "root_parent_hash",
+                ],
                 "source": "farcaster",
             },
             "reactions": {
@@ -93,6 +107,7 @@ class TemporalBehaviorExtractor(FeatureExtractor):
             consistency_metrics = self._extract_consistency_metrics(loaded_datasets)
             distribution_metrics = self._extract_distribution_metrics(loaded_datasets)
             advanced_metrics = self._extract_advanced_temporal_metrics(loaded_datasets)
+            channel_metrics = self._extract_channel_metrics(loaded_datasets)
 
             # Debugging: Check schemas and row counts
             self.logger.info(f"Schema of timing_metrics: {timing_metrics.schema}")
@@ -119,6 +134,7 @@ class TemporalBehaviorExtractor(FeatureExtractor):
                     consistency_metrics,
                     distribution_metrics,
                     advanced_metrics,
+                    channel_metrics,
                 ],
                 [
                     "timing_metrics",
@@ -127,6 +143,7 @@ class TemporalBehaviorExtractor(FeatureExtractor):
                     "consistency_metrics",
                     "distribution_metrics",
                     "advanced_metrics",
+                    "channel_metrics",
                 ],
             ):
                 if metrics is not None:
@@ -143,6 +160,32 @@ class TemporalBehaviorExtractor(FeatureExtractor):
         except Exception as e:
             self.logger.error(f"Error extracting temporal behavior features: {e}")
             raise
+
+    def _extract_channel_metrics(
+        self, loaded_datasets: Dict[str, pl.LazyFrame]
+    ) -> pl.LazyFrame:
+        casts = loaded_datasets.get("casts")
+
+        if casts is None:
+            return None
+
+        return (
+            casts.filter(
+                pl.col("deleted_at").is_null(), pl.col("parent_url").is_not_null()
+            )
+            .group_by("fid")
+            .agg(
+                [
+                    pl.n_unique("parent_url").alias("unique_channels"),
+                    (pl.n_unique("parent_url") / pl.count()).alias(
+                        "cross_channel_activity"
+                    ),
+                    (pl.col("parent_url").is_not_null().sum() / pl.count()).alias(
+                        "multi_channel_ratio"
+                    ),
+                ]
+            )
+        )
 
     def _extract_timing_metrics(
         self, loaded_datasets: Dict[str, pl.LazyFrame]
@@ -188,6 +231,11 @@ class TemporalBehaviorExtractor(FeatureExtractor):
             casts.filter(pl.col("deleted_at").is_null())
             .with_columns(
                 [
+                    pl.col("timestamp")
+                    .diff()
+                    .dt.total_seconds()
+                    .mean()
+                    .alias("avg_follow_latency_seconds"),
                     pl.col("timestamp").cast(pl.Datetime),
                     pl.col("timestamp").dt.hour().alias("hour"),
                     pl.col("timestamp").dt.weekday().alias("weekday"),
@@ -201,6 +249,9 @@ class TemporalBehaviorExtractor(FeatureExtractor):
             .group_by("fid")
             .agg(
                 [
+                    pl.col("avg_follow_latency_seconds")
+                    .mean()
+                    .alias("avg_follow_latency_seconds"),
                     pl.count().alias("posting_frequency"),
                     pl.col("time_diff").mean().alias("response_latency"),
                     pl.col("time_diff").std().alias("interaction_timing"),

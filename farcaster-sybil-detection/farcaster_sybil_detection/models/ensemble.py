@@ -1,5 +1,3 @@
-from numpy.typing import NDArray, ArrayLike
-from sklearn.model_selection import train_test_split
 from sklearn.base import clone
 import logging
 from typing import Dict, List, Tuple, Optional, Any
@@ -38,7 +36,6 @@ class OptimizedEnsemble(BaseModel):
         self.calibrated_models: Dict[str, Any] = {}
         self.weights: Optional[List[float]] = None
         self.shap_explainers: Dict[str, Any] = {}
-        self.meta_learner = None
         self.cross_val_metrics = {}
         self.scaler = StandardScaler()
         self.confidence_thresholds = config.confidence_thresholds or {
@@ -93,15 +90,22 @@ class OptimizedEnsemble(BaseModel):
             }
 
     def fit(self, X: np.ndarray, y: np.ndarray, feature_names: List[str]) -> None:
-        """Train optimized ensemble with comprehensive evaluation"""
+        """Train simple ensemble without stacking"""
         self.feature_names = feature_names or []
         cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
 
-        # Scale features if needed
-        X_scaled = self.scaler.fit_transform(X)
+        self.logger.info(f"Input shape: {X.shape}")
+        self.logger.info("Feature stats before scaling:")
+        self.logger.info(f"  Mean: {np.mean(X, axis=0)[:5]}...")
+        self.logger.info(f"  Std: {np.std(X, axis=0)[:5]}...")
 
-        base_model_configs = {
-            "xgb": xgb.XGBClassifier(eval_metric="auc", random_state=42),
+        # Initialize base models
+        base_models = {
+            "xgb": xgb.XGBClassifier(
+                eval_metric="auc",
+                random_state=42,
+                scale_pos_weight=np.sum(y == 0) / np.sum(y == 1),
+            ),
             "rf": RandomForestClassifier(
                 n_jobs=-1, random_state=42, class_weight="balanced"
             ),
@@ -110,7 +114,8 @@ class OptimizedEnsemble(BaseModel):
             ),
         }
 
-        for name, model in base_model_configs.items():
+        # Train and calibrate base models
+        for name, model in base_models.items():
             self.logger.info(f"Optimizing {name}...")
             study = optuna.create_study(
                 direction="maximize", study_name=f"optuna_{name}"
@@ -120,60 +125,44 @@ class OptimizedEnsemble(BaseModel):
                 params = self.get_hyperparameters(name, trial)
                 model.set_params(**params)
                 cv_scores = cross_val_score(
-                    model, X_scaled, y, cv=cv, scoring="average_precision", n_jobs=-1
+                    model, X, y, cv=cv, scoring="average_precision", n_jobs=-1
                 )
                 return cv_scores.mean()
 
             study.optimize(objective, n_trials=N_TRIALS, timeout=600)
 
-            # Train base model (uncalibrated)
+            # Train base model with best params
             best_model = type(model)(**study.best_params)
-            best_model.fit(X_scaled, y)
+            best_model.fit(X, y)
             self.base_models[name] = best_model
 
-            # Create SHAP explainer on uncalibrated model
+            # Create SHAP explainer
             try:
                 self.shap_explainers[name] = shap.TreeExplainer(best_model)
             except Exception as e:
                 self.logger.warning(f"SHAP explainer failed for {name}: {e}")
 
-            # Create calibrated version for predictions
-            calibrated = CalibratedClassifierCV(best_model, cv=5, method="isotonic")
-            calibrated.fit(X_scaled, y)
+            # Calibrate model
+            calibrated = CalibratedClassifierCV(best_model, cv=5)
+            calibrated.fit(X, y)
             self.calibrated_models[name] = calibrated
 
             self.logger.info(f"{name} best score: {study.best_value:.4f}")
 
-        # Build meta-learner using calibrated predictions
-        self._build_stacked_model(X_scaled, y)
-
-        # Get stability metrics
-        stability_metrics = self.add_cross_validation_stability(X_scaled, y)
-        self.logger.info("\nCross-validation Stability Metrics:")
-        for metric, value in stability_metrics.items():
-            self.logger.info(f"{metric}: {value:.4f}")
-
-        # Split validation data for weight optimization
-        X_val, X_test, y_val, y_test = train_test_split(
-            X_scaled, y, test_size=0.2, random_state=42
-        )
-
-        # Optimize ensemble weights
-        self.weights = self._optimize_weights(X_val, y_val)
-
-        # Create final weighted ensemble
+        # Create final ensemble with equal weights
         self.model = VotingClassifier(
-            estimators=[(name, model) for name, model in self.calibrated_models.items()]
-            + [("meta_learner", self.meta_learner)],
+            estimators=[
+                (name, model) for name, model in self.calibrated_models.items()
+            ],
             voting="soft",
-            weights=self.weights,
+            weights=[1.0 / len(self.calibrated_models)] * len(self.calibrated_models),
         )
 
         # Final fit
-        self.model.fit(X_scaled, y)
+        self.model.fit(X, y)
 
-        # Evaluate stability of final model
-        final_predictions, unstable_indices = self.predict_with_stability(X_test)
+        # Evaluate stability
+        final_predictions, unstable_indices = self.predict_with_stability(X)
         self.logger.info(f"Number of unstable predictions: {len(unstable_indices)}")
 
     def predict_with_stability(self, X: np.ndarray) -> Tuple[np.ndarray, List[int]]:
@@ -185,11 +174,13 @@ class OptimizedEnsemble(BaseModel):
         Returns:
             Tuple containing:
             - adjusted_predictions: Array of shape (n_samples, 2) with calibrated probabilities
-            - unstable_indices: List of indices where predictions are unstable (high variance between models)
-        """  # Scale features
-        X_scaled = self.scaler.transform(X)
+            - unstable_indices: List of indices where predictions are unstable
+        """
+        # Scale features
+        X_scaled = X
+        # X_scaled = self.scaler.transform(X)
 
-        # Get predictions from base models
+        # Get predictions from calibrated base models
         base_predictions = np.zeros((len(self.calibrated_models), len(X_scaled)))
         for i, model in enumerate(self.calibrated_models.values()):
             base_predictions[i] = model.predict_proba(X_scaled)[:, 1]
@@ -256,10 +247,10 @@ class OptimizedEnsemble(BaseModel):
                 estimators=[
                     (name, clone(model))
                     for name, model in self.calibrated_models.items()
-                ]
-                + [("meta_learner", clone(self.meta_learner))],
+                ],
                 voting="soft",
-                weights=self.weights,
+                weights=[1.0 / len(self.calibrated_models)]
+                * len(self.calibrated_models),
             )
             temp_model.fit(X_train, y_train)
             fold_proba = temp_model.predict_proba(X_val)[:, 1]
@@ -279,23 +270,6 @@ class OptimizedEnsemble(BaseModel):
             "max_prediction_range": np.max(sample_ranges),
             "stable_prediction_percentage": np.mean(sample_variances < 0.1),
         }
-
-    def _build_stacked_model(self, X: np.ndarray, y: np.ndarray) -> None:
-        """Build stacked model using calibrated predictions"""
-        base_preds = self._get_base_predictions(X)
-        meta_features = np.column_stack([base_preds.T, X])
-
-        self.meta_learner = LGBMClassifier(
-            n_estimators=100,
-            learning_rate=0.01,
-            max_depth=3,
-            num_leaves=8,
-            feature_fraction=0.8,
-            bagging_fraction=0.8,
-            random_state=42,
-            verbose=-1,
-        )
-        self.meta_learner.fit(meta_features, y)
 
     def _get_base_predictions(self, X: np.ndarray) -> np.ndarray:
         """Get predictions from all base models"""
@@ -475,7 +449,8 @@ class OptimizedEnsemble(BaseModel):
         self, X: np.ndarray, y: np.ndarray, threshold: float = 0.01
     ) -> List[str]:
         """Select important features using SHAP values"""
-        X_scaled = self.scaler.transform(X)
+        # X_scaled = self.scaler.transform(X)
+        X_scaled = X
 
         # Use XGBoost for feature selection
         selector = xgb.XGBClassifier(n_estimators=100, random_state=42)

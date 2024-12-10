@@ -1,67 +1,17 @@
-from farcaster_sybil_detection.features.extractors.farcaster.reaction_features import (
-    ReactionFeatureExtractor,
-)
-from farcaster_sybil_detection.features.extractors.farcaster.network_features import (
-    NetworkFeatureExtractor,
-)
+import logging
+import os
+from pathlib import Path
+from typing import Dict, List, Optional, Union
 
-# from farcaster_sybil_detection.features.extractors.farcaster.activity_patterns import ActivityPatternsExtractor
-from farcaster_sybil_detection.features.extractors.farcaster.authenticity_features import (
-    AuthenticityExtractor,
-)
-from farcaster_sybil_detection.features.extractors.farcaster.behavioral import (
-    BehavioralFeatureExtractor,
-)
-from farcaster_sybil_detection.features.extractors.farcaster.cast_features import (
-    CastBehaviorExtractor,
-)
-from farcaster_sybil_detection.features.extractors.farcaster.influence_features import (
-    InfluenceFeatureExtractor,
-)
-from farcaster_sybil_detection.features.extractors.farcaster.derived_features import (
-    DerivedFeatureExtractor,
-)
-from farcaster_sybil_detection.features.extractors.farcaster.network_quality_features import (
-    NetworkQualityExtractor,
-)
-from farcaster_sybil_detection.features.extractors.farcaster.power_user_interactions import (
-    PowerUserInteractionExtractor,
-)
-
-from farcaster_sybil_detection.features.extractors.farcaster.verification_features import (
-    VerificationFeatureExtractor,
-)
-
-# from farcaster_sybil_detection.features.extractors.farcaster.verification_pattern import VerificationPatternExtractor
-from farcaster_sybil_detection.features.extractors.farcaster.temporal_features import (
-    TemporalFeatureExtractor,
-)
-from farcaster_sybil_detection.features.extractors.farcaster.update_behavior import (
-    UpdateBehaviorExtractor,
-)
-from farcaster_sybil_detection.features.extractors.farcaster.mentions import (
-    MentionsExtractor,
-)
-from farcaster_sybil_detection.features.extractors.nindexer.network_extractor import (
-    EnhancedNetworkExtractor,
-)
-from farcaster_sybil_detection.features.extractors.farcaster.network_features import (
-    NetworkFeatureExtractor,
-)
+import polars as pl
+from farcaster_sybil_detection.data.dataset_loader import DatasetLoader
 from farcaster_sybil_detection.features.extractors.base import FeatureExtractor
-from farcaster_sybil_detection.features.extractors.nindexer.neynar_score_extractor import (
-    NeynarScoreFeatureExtractor,
-)
-from farcaster_sybil_detection.features.interface import IFeatureProvider
-
 from farcaster_sybil_detection.features.extractors.content_engagement_extractor import (
     ContentEngagementExtractor,
 )
+
 from farcaster_sybil_detection.features.extractors.network_analysis_extractor import (
     NetworkAnalysisExtractor,
-)
-from farcaster_sybil_detection.features.extractors.reputation_meta_extractor import (
-    ReputationMetaExtractor,
 )
 from farcaster_sybil_detection.features.extractors.temporal_behavior_extractor import (
     TemporalBehaviorExtractor,
@@ -69,22 +19,9 @@ from farcaster_sybil_detection.features.extractors.temporal_behavior_extractor i
 from farcaster_sybil_detection.features.extractors.user_identity_extractor import (
     UserIdentityExtractor,
 )
-
-from typing import Dict, List, Optional, Union
-from farcaster_sybil_detection.data.dataset_loader import DatasetLoader
-import polars as pl
-from pathlib import Path
-import os
-import logging
+from farcaster_sybil_detection.features.interface import IFeatureProvider
 
 from ..config.defaults import Config
-
-from farcaster_sybil_detection.features.extractors.farcaster.profile_features import (
-    ProfileFeatureExtractor,
-)
-from farcaster_sybil_detection.features.extractors.farcaster.reaction_features import (
-    ReactionFeatureExtractor,
-)
 
 
 class FeatureSet:
@@ -140,25 +77,6 @@ class FeatureManager(IFeatureProvider):
             # "reputation_meta": ReputationMetaExtractor(
             #     feature_config, self.data_loader
             # ),
-            # old features
-            # 'profile': ProfileFeatureExtractor(feature_config, self.data_loader),
-            # 'reaction': ReactionFeatureExtractor(feature_config, self.data_loader),
-            # 'neynar_score': NeynarScoreFeatureExtractor(feature_config, self.data_loader),
-            # 'network': NetworkFeatureExtractor(feature_config, self.data_loader),
-            # 'activity_patterns': ActivityPatternsExtractor(feature_config, self.data_loader),
-            # 'authenticity': AuthenticityExtractor(feature_config, self.data_loader),
-            # 'behavioral': BehavioralFeatureExtractor(feature_config, self.data_loader),
-            # 'cast_behavior': CastBehaviorExtractor(feature_config, self.data_loader),
-            # 'influence': InfluenceFeatureExtractor(feature_config, self.data_loader),
-            # 'derived': DerivedFeatureExtractor(feature_config, self.data_loader),
-            # 'network_quality': NetworkQualityExtractor(feature_config, self.data_loader),
-            # 'power_user_interactions': PowerUserInteractionExtractor(feature_config, self.data_loader),
-            # 'mentions': MentionsExtractor(feature_config, self.data_loader),
-            # 'verification': VerificationFeatureExtractor(feature_config, self.data_loader),
-            # 'temporal': TemporalFeatureExtractor(feature_config, self.data_loader),
-            # 'update_behavior': UpdateBehaviorExtractor(feature_config, self.data_loader),
-            # 'storage': StorageExtractor(feature_config, self.data_loader),
-            # 'enhanced_network': EnhancedNetworkExtractor(feature_config, self.data_loader),
         }
 
     def _initialize_feature_sets(self) -> Dict[str, FeatureSet]:
@@ -225,7 +143,7 @@ class FeatureManager(IFeatureProvider):
 
             # Verify FID columns
             if "fid" not in df.columns:
-                raise ValueError(f"Base DataFrame missing fid column")
+                raise ValueError("Base DataFrame missing fid column")
             if "fid" not in new_features.columns:
                 raise ValueError(f"New features missing fid column for {feature_name}")
 

@@ -1,6 +1,5 @@
 from typing import List, Dict
 import polars as pl
-import numpy as np
 from farcaster_sybil_detection.features.extractors.base import FeatureExtractor
 from farcaster_sybil_detection.features.config import FeatureConfig
 from farcaster_sybil_detection.data.dataset_loader import DatasetLoader
@@ -13,11 +12,7 @@ class NetworkAnalysisExtractor(FeatureExtractor):
         super().__init__(config, data_loader)
         self.feature_names = [
             # Basic network metrics
-            "follower_count",
-            "following_count",
             "follow_ratio",
-            "unique_followers",
-            "unique_following",
             # Growth and velocity
             "network_growth_rate",
             "follow_velocity",
@@ -32,13 +27,6 @@ class NetworkAnalysisExtractor(FeatureExtractor):
             "network_reach",
             # "influential_followers",
             # "influencer_ratio",
-            # Power user interactions
-            "power_user_interaction_rate",
-            "power_user_engagement",
-            "power_user_influence",
-            "power_user_reciprocity",
-            "power_user_reach",
-            "power_user_alignment",
             # Network stability
             "network_churn_rate",
             "relationship_longevity",
@@ -49,6 +37,16 @@ class NetworkAnalysisExtractor(FeatureExtractor):
             "bridge_score",
             "community_embedding",
             "network_diversity",
+            # were missing
+            # "follower_authenticity_score",
+            # "follower_ratio_log",
+            # "unique_follower_ratio_log",
+            # "follow_velocity_log",
+            # "follower_ratio_capped",
+            # "unique_follower_ratio_capped",
+            # "follow_velocity_capped",
+            # "target_url_diversity",
+            # "follower_retention",
         ]
 
     def get_dependencies(self) -> List[str]:
@@ -70,7 +68,6 @@ class NetworkAnalysisExtractor(FeatureExtractor):
                 "columns": ["fid", "follower_count", "following_count", "created_at"],
                 "source": "nindexer",
             },
-            "power_users": {"columns": ["fid"], "source": "farcaster"},
             "reactions": {
                 "columns": ["fid", "target_fid", "timestamp", "deleted_at"],
                 "source": "farcaster",
@@ -91,10 +88,13 @@ class NetworkAnalysisExtractor(FeatureExtractor):
             basic_metrics = self._extract_basic_metrics(loaded_datasets)
             growth_metrics = self._extract_growth_metrics(loaded_datasets)
             quality_metrics = self._extract_quality_metrics(loaded_datasets)
-            power_follow_counts = self._extract_power_follow_counts(loaded_datasets)
             stability_metrics = self._extract_stability_metrics(loaded_datasets)
             centrality_metrics = self._extract_centrality_metrics(loaded_datasets)
             advanced_metrics = self._extract_advanced_metrics(loaded_datasets)
+            # derived_metrics = self._extract_derived_metrics(loaded_datasets)
+            engagement_diversity_metrics = self._extract_engagement_diversity(
+                loaded_datasets
+            )
 
             # Combine all features
             result = df.clone()
@@ -102,10 +102,11 @@ class NetworkAnalysisExtractor(FeatureExtractor):
                 basic_metrics,
                 growth_metrics,
                 quality_metrics,
-                power_follow_counts,
                 stability_metrics,
                 centrality_metrics,
                 advanced_metrics,
+                # derived_metrics,
+                engagement_diversity_metrics,
             ]:
                 if metrics is not None:
                     result = result.join(metrics, on="fid", how="left")
@@ -115,6 +116,74 @@ class NetworkAnalysisExtractor(FeatureExtractor):
         except Exception as e:
             self.logger.error(f"Error extracting network analysis features: {e}")
             raise
+
+    def _extract_engagement_diversity(
+        self, loaded_datasets: Dict[str, pl.LazyFrame]
+    ) -> pl.LazyFrame:
+        links = loaded_datasets.get("links")
+        reactions = loaded_datasets.get("reactions")
+
+        if links is None or reactions is None:
+            return None
+
+        return (
+            reactions.filter(pl.col("deleted_at").is_null())
+            .group_by("fid")
+            .agg(
+                [
+                    pl.n_unique("target_url").alias("target_url_diversity"),
+                    # Calculate retention
+                    (1 - pl.col("deleted_at").is_not_null().sum() / pl.len()).alias(
+                        "follower_retention"
+                    ),
+                ]
+            )
+        )
+
+    def _extract_derived_metrics(
+        self, loaded_datasets: Dict[str, pl.LazyFrame]
+    ) -> pl.LazyFrame:
+        follows = loaded_datasets.get("follows")
+        if follows is None:
+            return pl.DataFrame({"fid": []}).lazy()
+
+        derived = (
+            follows.filter(pl.col("deleted_at").is_null())
+            .group_by("fid")
+            .agg(
+                [
+                    pl.col("follower_count").log1p().alias("follower_ratio_log"),
+                    pl.col("unique_followers")
+                    .log1p()
+                    .alias("unique_follower_ratio_log"),
+                    pl.col("follow_velocity").log1p().alias("follow_velocity_log"),
+                ]
+            )
+            .with_columns(
+                [
+                    pl.col("follower_ratio")
+                    .clip(0, pl.col("follower_ratio").quantile(0.99))
+                    .alias("follower_ratio_capped"),
+                    pl.col("unique_follower_ratio")
+                    .clip(0, pl.col("unique_follower_ratio").quantile(0.99))
+                    .alias("unique_follower_ratio_capped"),
+                    pl.col("follow_velocity")
+                    .clip(0, pl.col("follow_velocity").quantile(0.99))
+                    .alias("follow_velocity_capped"),
+                ]
+            )
+        )
+
+        # Calculate follower authenticity score
+        return derived.with_columns(
+            [
+                (
+                    1.0
+                    - (pl.col("following_count") - pl.col("follower_count")).abs()
+                    / (pl.col("following_count") + pl.col("follower_count") + 1)
+                ).alias("follower_authenticity_score")
+            ]
+        )
 
     def _extract_centrality_metrics(
         self, loaded_datasets: Dict[str, pl.LazyFrame]
@@ -352,95 +421,6 @@ class NetworkAnalysisExtractor(FeatureExtractor):
             )
 
         return reciprocal_follows.join(network_metrics, on="fid", how="left")
-
-    def _extract_power_follow_counts(
-        self, loaded_datasets: Dict[str, pl.LazyFrame]
-    ) -> pl.LazyFrame:
-        follows = loaded_datasets.get("follows")
-        power_users = loaded_datasets.get("power_users")
-        reactions = loaded_datasets.get("reactions")
-
-        if follows is None or power_users is None:
-            return pl.DataFrame({"fid": []}).lazy()
-
-        power_fids = power_users.select("fid").collect()["fid"].cast(pl.Int64).unique()
-
-        # Calculate power user follow metrics
-        power_follows = (
-            follows.filter(pl.col("deleted_at").is_null())
-            .with_columns(
-                [
-                    pl.col("target_fid")
-                    .cast(pl.Int64)
-                    .is_in(power_fids)
-                    .alias("is_power_follow")
-                ]
-            )
-            .group_by("fid")
-            .agg(
-                [
-                    pl.sum("is_power_follow").alias("power_user_follows"),
-                    (pl.sum("is_power_follow") / pl.len()).alias(
-                        "power_user_interaction_rate"
-                    ),
-                ]
-            )
-        )
-
-        # Calculate power user engagement if reactions available
-        if reactions is not None:
-            power_engagement = (
-                reactions.filter(pl.col("deleted_at").is_null())
-                .with_columns(
-                    [
-                        pl.col("target_fid")
-                        .cast(pl.Int64)
-                        .is_in(power_fids)
-                        .alias("is_power_reaction")
-                    ]
-                )
-                .group_by("fid")
-                .agg(
-                    [
-                        pl.sum("is_power_reaction").alias("power_user_reactions"),
-                        (pl.sum("is_power_reaction") / pl.len()).alias(
-                            "power_user_engagement"
-                        ),
-                    ]
-                )
-            )
-
-            power_follows = power_follows.join(power_engagement, on="fid", how="left")
-
-        # Calculate advanced power user metrics
-        return power_follows.with_columns(
-            [
-                # Power user influence combines multiple factors
-                (
-                    (
-                        pl.col("power_user_interaction_rate").fill_null(0) * 0.4
-                        + pl.col("power_user_engagement").fill_null(0) * 0.4
-                        + pl.col("power_user_follows").fill_null(0) / 100.0 * 0.2
-                    )
-                ).alias("power_user_influence"),
-                # Calculate reciprocity with power users
-                (
-                    pl.col("power_user_reactions").fill_null(0)
-                    / (pl.col("power_user_follows").fill_null(0) + 1)
-                ).alias("power_user_reciprocity"),
-                # Calculate reach through power users
-                (
-                    pl.col("power_user_follows").fill_null(0) * pl.lit(1000)
-                ).alias(  # Assuming average power user reach
-                    "power_user_reach"
-                ),
-                # Calculate alignment with power users
-                (
-                    pl.col("power_user_engagement").fill_null(0)
-                    / pl.col("power_user_interaction_rate").fill_null(1)
-                ).alias("power_user_alignment"),
-            ]
-        )
 
     def _extract_stability_metrics(
         self, loaded_datasets: Dict[str, pl.LazyFrame]

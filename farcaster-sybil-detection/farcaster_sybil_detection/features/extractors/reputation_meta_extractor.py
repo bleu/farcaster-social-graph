@@ -1,7 +1,5 @@
 from typing import List, Dict
 import polars as pl
-import re
-import numpy as np
 from farcaster_sybil_detection.features.extractors.base import FeatureExtractor
 from farcaster_sybil_detection.features.config import FeatureConfig
 from farcaster_sybil_detection.data.dataset_loader import DatasetLoader
@@ -14,11 +12,10 @@ class ReputationMetaExtractor(FeatureExtractor):
         super().__init__(config, data_loader)
         self.feature_names = [
             # Core reputation scores
-            "authenticity_score",
-            "neynar_score",
+            # "authenticity_score",
             "influence_score",
-            "trust_score",
-            "quality_score",
+            # "trust_score",
+            # "quality_score",
             "activity_score",
             # Network reputation
             "network_quality",
@@ -55,6 +52,18 @@ class ReputationMetaExtractor(FeatureExtractor):
             "resilience_metric",
             "innovation_index",
             "potential_score",
+            # were missing
+            "verification_timing_std",
+            "sequential_verifications",
+            "verification_gaps",
+            "neynar_score",
+            "avg_neynar_score",
+            "neynar_score_std",
+            "score_trend",
+            "score_divergence",
+            "relative_score_diff",
+            "reach_metrics",
+            "engagement_impact",
         ]
 
     def get_dependencies(self) -> List[str]:
@@ -97,6 +106,7 @@ class ReputationMetaExtractor(FeatureExtractor):
             behavioral_reputation = self._extract_behavioral_reputation(loaded_datasets)
             trust_metrics = self._extract_trust_metrics(loaded_datasets)
             meta_scores = self._extract_meta_scores(loaded_datasets)
+            verification_metrics = self._extract_verification_metrics(loaded_datasets)
 
             # Combine all features
             result = df.clone()
@@ -107,6 +117,7 @@ class ReputationMetaExtractor(FeatureExtractor):
                 behavioral_reputation,
                 trust_metrics,
                 meta_scores,
+                verification_metrics,
             ]:
                 if features is not None:
                     result = result.join(features, on="fid", how="left")
@@ -116,6 +127,71 @@ class ReputationMetaExtractor(FeatureExtractor):
         except Exception as e:
             self.logger.error(f"Error extracting reputation meta features: {e}")
             raise
+
+    def _extract_verification_metrics(
+        self, loaded_datasets: Dict[str, pl.LazyFrame]
+    ) -> pl.LazyFrame:
+        verifications = loaded_datasets.get("verifications")
+        neynar_scores = loaded_datasets.get("neynar_user_scores")
+
+        if verifications is None:
+            return pl.DataFrame({"fid": []}).lazy()
+
+        verification_metrics = (
+            verifications.filter(pl.col("deleted_at").is_null())
+            .with_columns([pl.col("timestamp").cast(pl.Datetime)])
+            .group_by("fid")
+            .agg(
+                [
+                    pl.col("timestamp")
+                    .diff()
+                    .dt.total_hours()
+                    .std()
+                    .alias("verification_timing_std"),
+                    (pl.col("timestamp").diff().dt.total_hours() < 1)
+                    .sum()
+                    .alias("sequential_verifications"),
+                    (pl.col("timestamp").diff().dt.total_hours() > 24)
+                    .sum()
+                    .alias("verification_gaps"),
+                ]
+            )
+        )
+
+        if neynar_scores is not None:
+            neynar_metrics = (
+                neynar_scores.sort("created_at")
+                .group_by("fid")
+                .agg(
+                    [
+                        pl.col("score").mean().alias("avg_neynar_score"),
+                        pl.col("score").std().alias("neynar_score_std"),
+                        pl.col("score").last().alias("neynar_score"),
+                        (pl.col("score").last() - pl.col("score").first()).alias(
+                            "score_trend"
+                        ),
+                        (pl.col("score").max() - pl.col("score").min()).alias(
+                            "score_divergence"
+                        ),
+                        (
+                            (pl.col("score").last() - pl.col("score").first())
+                            / pl.col("score").first()
+                        ).alias("relative_score_diff"),
+                    ]
+                )
+            )
+            verification_metrics = verification_metrics.join(
+                neynar_metrics, on="fid", how="left"
+            )
+
+        return verification_metrics.with_columns(
+            [
+                # pl.col("unique_reactors").alias("reach_metrics"),
+                # (pl.col("total_reactions") / pl.col("cast_count")).alias(
+                #     "engagement_impact"
+                # ),
+            ]
+        )
 
     def _extract_core_scores(
         self, loaded_datasets: Dict[str, pl.LazyFrame]
