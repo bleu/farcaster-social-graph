@@ -1,4 +1,5 @@
-from typing import Dict, List, Tuple
+from typing import Dict, Tuple
+from farcaster_sybil_detection.utils.with_logging import add_logging
 import numpy as np
 from sklearn.metrics import (
     cohen_kappa_score,
@@ -13,6 +14,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 
 
+@add_logging
 class EvaluationMetrics:
     """Comprehensive evaluation metrics for Sybil detection with proper type handling"""
 

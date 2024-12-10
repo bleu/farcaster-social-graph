@@ -11,8 +11,6 @@ class Config:
     checkpoint_dir: Path
     checkpoint_enabled = True
     model_dir: Path
-    debug_mode: bool = False
-    cache_enabled: bool = True
     authenticity_thresholds: Optional[Dict[str, float]] = None
     sample_size: int = 200_000
     fids_to_ensure: Optional[List[int]] = None

@@ -1,4 +1,4 @@
-from typing import List, Dict
+from typing import Dict
 import polars as pl
 from farcaster_sybil_detection.features.extractors.base import FeatureExtractor
 from farcaster_sybil_detection.data.dataset_loader import DatasetLoader
@@ -9,7 +9,11 @@ class UserIdentityExtractor(FeatureExtractor):
 
     def __init__(self, data_loader: DatasetLoader):
         super().__init__(data_loader)
-        self.feature_names = [
+        self.feature_names = self.get_feature_names()
+
+    @classmethod
+    def get_feature_names(cls):
+        return [
             # Profile basics
             "has_ens",
             "has_bio",
@@ -55,9 +59,6 @@ class UserIdentityExtractor(FeatureExtractor):
             "profile_authenticity",
             "resource_utilization",
         ]
-
-    def get_dependencies(self) -> List[str]:
-        return []
 
     def get_required_datasets(self) -> Dict[str, Dict]:
         return {

@@ -1,6 +1,6 @@
 from typing import Dict, List, Optional, Any
+from farcaster_sybil_detection.models.base import BaseModel
 import numpy as np
-import logging
 import optuna
 from sklearn.model_selection import cross_val_score, StratifiedKFold
 from sklearn.calibration import CalibratedClassifierCV
@@ -10,29 +10,19 @@ from lightgbm import LGBMClassifier
 from sklearn.ensemble import RandomForestClassifier
 
 
-class OptimizedEnsemble:
+class OptimizedEnsemble(BaseModel):
     """Optimized ensemble model with stability tracking and confidence estimates"""
 
-    def __init__(self, random_state: int = 42, n_trials: int = 50):
+    def __init__(
+        self, checkpoint_path: str, random_state: int = 42, n_trials: int = 50
+    ):
+        super().__init__(checkpoint_path)
         self.random_state = random_state
         self.n_trials = n_trials
         self.base_models: Dict[str, Any] = {}
         self.calibrated_models: Dict[str, Any] = {}
         self.model: Optional[VotingClassifier] = None
         self.feature_names: List[str] = []
-        self._setup_logging()
-
-    def _setup_logging(self) -> None:
-        self.logger = logging.getLogger(self.__class__.__name__)
-        self.logger.setLevel(logging.INFO)
-        if not self.logger.handlers:
-            ch = logging.StreamHandler()
-            ch.setLevel(logging.INFO)
-            formatter = logging.Formatter(
-                "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-            )
-            ch.setFormatter(formatter)
-            self.logger.addHandler(ch)
 
     def _get_base_predictions(self, X: np.ndarray) -> np.ndarray:
         """Get predictions from all calibrated base models"""

@@ -2,33 +2,22 @@ from pathlib import Path
 from typing import List, Optional, Dict, Union
 import hashlib
 import json
-import logging
 
+from farcaster_sybil_detection.services.base import BaseDataLoader
+from farcaster_sybil_detection.utils.with_logging import add_logging
 import polars as pl
 from farcaster_sybil_detection.config.defaults import Config
 
 
-class DatasetLoader:
+@add_logging
+class DatasetLoader(BaseDataLoader):
     """Handles dataset loading with consistent FID filtering"""
 
     def __init__(self, config: Config):
         self.config = config
         self._base_fids: Optional[List[int]] = None
         self._cached_datasets: Dict[str, Union[pl.DataFrame, pl.LazyFrame]] = {}
-        self._setup_logging()
         self._validate_paths()
-
-    def _setup_logging(self):
-        self.logger = logging.getLogger(self.__class__.__name__)
-        self.logger.setLevel(logging.INFO)
-        if not self.logger.handlers:
-            ch = logging.StreamHandler()
-            ch.setLevel(logging.INFO)
-            formatter = logging.Formatter(
-                "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-            )
-            ch.setFormatter(formatter)
-            self.logger.addHandler(ch)
 
     def _validate_paths(self):
         """Ensure necessary directories exist"""
