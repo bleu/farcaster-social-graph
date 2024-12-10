@@ -212,7 +212,8 @@ class OptimizedEnsemble(BaseModel):
 
     def get_prediction_confidence(self, X: np.ndarray) -> np.ndarray:
         """Calculate confidence scores considering stability"""
-        X_scaled = self.scaler.transform(X)
+        X_scaled = X
+        # X_scaled = self.scaler.transform(X)
         base_predictions = self._get_base_predictions(X_scaled)
 
         mean_preds = np.mean(base_predictions, axis=0)
@@ -401,7 +402,8 @@ class OptimizedEnsemble(BaseModel):
             base_model = next(iter(self.base_models.values()))
 
         try:
-            X_scaled = self.scaler.transform(X)
+            X_scaled = X
+            # X_scaled = self.scaler.transform(X)
             explainer = shap.TreeExplainer(base_model)
             shap_interaction_values = explainer.shap_interaction_values(X_scaled)
 
@@ -423,7 +425,8 @@ class OptimizedEnsemble(BaseModel):
 
     def get_prediction_diagnostics(self, X: np.ndarray) -> Dict[str, np.ndarray]:
         """Get detailed prediction diagnostics"""
-        X_scaled = self.scaler.transform(X)
+        X_scaled = X
+        # X_scaled = self.scaler.transform(X)
         base_predictions = self._get_base_predictions(X_scaled)
 
         mean_preds = np.mean(base_predictions, axis=0)
@@ -449,6 +452,7 @@ class OptimizedEnsemble(BaseModel):
         self, X: np.ndarray, y: np.ndarray, threshold: float = 0.01
     ) -> List[str]:
         """Select important features using SHAP values"""
+        # X
         # X_scaled = self.scaler.transform(X)
         X_scaled = X
 

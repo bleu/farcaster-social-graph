@@ -189,10 +189,11 @@ class ContentEngagementExtractor(FeatureExtractor):
             return pl.DataFrame({"fid": []}).lazy()
 
         return (
-            casts.filter(pl.col("deleted_at").is_null())
+            casts.filter(pl.col("deleted_at").is_null(), pl.col("text").is_not_null())
             .with_columns(
                 [
                     pl.col("mentions")
+                    .fill_null("[]")
                     .str.json_decode()
                     .list.len()
                     .alias("mention_count"),
@@ -240,7 +241,7 @@ class ContentEngagementExtractor(FeatureExtractor):
             return pl.DataFrame({"fid": []}).lazy()
 
         return (
-            casts.filter(pl.col("deleted_at").is_null())
+            casts.filter(pl.col("deleted_at").is_null(), pl.col("text").is_not_null())
             .with_columns(
                 [
                     # Basic metrics - cast to Float64 explicitly
@@ -432,7 +433,7 @@ class ContentEngagementExtractor(FeatureExtractor):
             # Vocabulary richness
             vocab_df = base.with_columns(
                 [
-                    pl.col("text").str.split(" ").alias("words"),
+                    pl.col("text").str.split(" ").alias("words").fill_null([]),
                     pl.col("fid").alias("fid_vocab"),
                 ]
             ).select(
