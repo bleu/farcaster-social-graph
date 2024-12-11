@@ -72,15 +72,13 @@ class ContentEngagementExtractor(FeatureExtractor):
             "avg_mentions_per_cast",
             "mention_frequency",
             # "mention_ratio",
-            "template_usage_ratio",
-            "urgency_ratio",
             "emoji_spam_ratio",
             "price_mention_ratio",
             "symbol_spam_ratio",
             "airdrop_term_ratio",
-            "parent_fid_diversity",
-            "root_thread_participation",
-            "embed_usage_ratio",
+            # "parent_fid_diversity",
+            # "root_thread_participation",
+            # "embed_usage_ratio",
         ]
 
     def get_required_datasets(self) -> Dict[str, Dict]:
@@ -129,7 +127,7 @@ class ContentEngagementExtractor(FeatureExtractor):
             quality_metrics = self._extract_quality_metrics(loaded_datasets)
             spam_metrics = self._extract_spam_metrics(loaded_datasets)
             mention_metrics = self._extract_mention_metrics(loaded_datasets)
-            thread_metrics = self._extract_thread_metrics(loaded_datasets)
+            # thread_metrics = self._extract_thread_metrics(loaded_datasets)
             # advanced_metrics = self._extract_advanced_metrics(loaded_datasets)
 
             # Combine all features
@@ -141,11 +139,15 @@ class ContentEngagementExtractor(FeatureExtractor):
                 quality_metrics,
                 spam_metrics,
                 mention_metrics,
-                thread_metrics,
+                # thread_metrics,
                 # advanced_metrics,
             ]:
                 if metrics is not None:
                     result = result.join(metrics, on="fid", how="left")
+
+                    import gc
+
+                    gc.collect()
 
             return result.select(["fid"] + self.feature_names)
 
@@ -198,12 +200,6 @@ class ContentEngagementExtractor(FeatureExtractor):
                     .list.len()
                     .alias("mention_count"),
                     pl.col("text")
-                    .str.contains(r"\[.*?\]|\{.*?\}|\<.*?\>")
-                    .alias("has_template"),
-                    pl.col("text")
-                    .str.contains(r"\b(hurry|limited|fast|quick|soon|ending)\b")
-                    .alias("has_urgency"),
-                    pl.col("text")
                     .str.contains(r"[\U0001F300-\U0001F9FF]{5,}")
                     .alias("has_emoji_spam"),
                     pl.col("text").str.contains(r"\$\d+|\d+\$").alias("has_price"),
@@ -223,8 +219,6 @@ class ContentEngagementExtractor(FeatureExtractor):
                         "mention_frequency"
                     ),
                     # (pl.col("total_mentions") / pl.len()).alias("mention_ratio"),
-                    pl.col("has_template").mean().alias("template_usage_ratio"),
-                    pl.col("has_urgency").mean().alias("urgency_ratio"),
                     pl.col("has_emoji_spam").mean().alias("emoji_spam_ratio"),
                     pl.col("has_price").mean().alias("price_mention_ratio"),
                     pl.col("has_symbol_spam").mean().alias("symbol_spam_ratio"),
