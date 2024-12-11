@@ -125,32 +125,6 @@ class OptimizedEnsemble(BaseModel):
         )
         self.model.fit(X, y)
 
-    def predict_proba(self, X: np.ndarray) -> np.ndarray:
-        """Get probability predictions with stability adjustment"""
-        if self.model is None:
-            raise RuntimeError("Model must be fitted before prediction")
-
-        # Get base model predictions
-        base_predictions = self._get_base_predictions(X)
-        std_predictions = np.std(base_predictions, axis=0)
-
-        # Get ensemble predictions
-        predictions = self.model.predict_proba(X)
-
-        # Adjust predictions based on model agreement
-        confidence_adjustments = 1 - np.clip(std_predictions, 0, 0.5)
-
-        # Move predictions toward 0.5 based on uncertainty while maintaining normalization
-        adjusted_class1_probs = predictions[:, 1] * confidence_adjustments + 0.5 * (
-            1 - confidence_adjustments
-        )
-
-        adjusted_predictions = np.zeros_like(predictions)
-        adjusted_predictions[:, 1] = adjusted_class1_probs
-        adjusted_predictions[:, 0] = 1 - adjusted_class1_probs
-
-        return adjusted_predictions
-
     def predict(self, X: np.ndarray) -> np.ndarray:
         """Make binary predictions"""
         probas = self.predict_proba(X)
@@ -183,15 +157,55 @@ class OptimizedEnsemble(BaseModel):
 
         return {}
 
+    def predict_proba(self, X: np.ndarray) -> np.ndarray:
+        """Get probability predictions from the voting classifier"""
+        if self.model is None:
+            raise RuntimeError("Model must be fitted before prediction")
+
+        # The VotingClassifier already handles the averaging of predictions
+        # and applies the weights we specified during initialization
+        predictions = self.model.predict_proba(X)
+
+        # If we want to add uncertainty adjustment, we can get individual predictions
+        # directly from the VotingClassifier's estimators
+        individual_predictions = np.array(
+            [est.predict_proba(X)[:, 1] for est in self.model.estimators_]
+        )
+
+        # Calculate prediction uncertainty
+        std_predictions = np.std(individual_predictions, axis=0)
+
+        # Adjust predictions based on model agreement
+        confidence_adjustments = 1 - np.clip(std_predictions, 0, 0.5)
+
+        # Move predictions toward 0.5 based on uncertainty
+        adjusted_class1_probs = predictions[:, 1] * confidence_adjustments + 0.5 * (
+            1 - confidence_adjustments
+        )
+
+        # Create final predictions array
+        adjusted_predictions = np.zeros_like(predictions)
+        adjusted_predictions[:, 1] = adjusted_class1_probs
+        adjusted_predictions[:, 0] = 1 - adjusted_class1_probs
+
+        return adjusted_predictions
+
     def get_prediction_confidence(self, X: np.ndarray) -> np.ndarray:
-        """Calculate confidence scores for predictions"""
-        base_predictions = self._get_base_predictions(X)
-        mean_preds = np.mean(base_predictions, axis=0)
-        std_preds = np.std(base_predictions, axis=0)
+        """Calculate confidence scores using VotingClassifier's estimators"""
+        if self.model is None:
+            raise RuntimeError("Model must be fitted before prediction")
+
+        # Get predictions directly from estimators
+        individual_predictions = np.array(
+            [est.predict_proba(X)[:, 1] for est in self.model.estimators_]
+        )
+
+        mean_preds = np.mean(individual_predictions, axis=0)
+        std_preds = np.std(individual_predictions, axis=0)
 
         # Combine distance from decision boundary and model agreement
-        boundary_distance = np.abs(mean_preds - 0.5) * 2  # Scale to [0,1]
-        model_agreement = 1 - std_preds  # Already in [0,1]
+        boundary_distance = np.abs(mean_preds - 0.5) * 2
+        model_agreement = 1 - std_preds
 
         confidence = (boundary_distance + model_agreement) / 2
         return np.clip(confidence, 0, 1)
