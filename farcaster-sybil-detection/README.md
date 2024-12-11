@@ -12,7 +12,7 @@ Package to handle Sybil Detection using Machine Learning
 
 ### Example usage
 
-The notebook 17-framework-usage shows an example of how to use the library
+The notebook 20-framework-usage shows an example of how to use the library
 
 ### Data needed
 
