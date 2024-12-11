@@ -2,6 +2,7 @@ from pathlib import Path
 from typing import List, Optional, Dict, Union
 import hashlib
 import json
+import re
 
 from farcaster_sybil_detection.services.base import BaseDataLoader
 from farcaster_sybil_detection.utils.with_logging import add_logging
@@ -25,13 +26,37 @@ class DatasetLoader(BaseDataLoader):
         self.config.checkpoint_dir.mkdir(parents=True, exist_ok=True)
 
     def _get_dataset_path(self, source: str, name: str) -> Path:
-        """Get path for a dataset"""
-        if source == "farcaster":
-            return self.config.data_path / f"{source}-{name}-0-1733162400.parquet"
-        elif source == "nindexer":
-            return self.config.data_path / f"{source}-{name}-0-1733508243.parquet"
-        else:
+        """Get path for a dataset by finding the latest timestamp version."""
+        if source not in ["farcaster", "nindexer"]:
             raise ValueError(f"Unknown dataset source: {source}")
+    
+        # List all matching files
+        pattern = f"{source}-{name}-*-*.parquet"
+        matching_files = list(self.config.data_path.glob(pattern))
+        
+        if not matching_files:
+            raise ValueError(f"No dataset files found matching pattern: {pattern}")
+        
+        # Extract timestamps and find latest
+        latest_file = None
+        latest_timestamp = 0
+        
+        for file_path in matching_files:
+            # Extract end timestamp from filename
+            match = re.search(r'-(\d+)\.parquet$', file_path.name)
+            if match:
+                timestamp = int(match.group(1))
+                if timestamp > latest_timestamp:
+                    latest_timestamp = timestamp
+                    latest_file = file_path
+        
+        if latest_file is None:
+            raise ValueError(f"""
+                No valid timestamps found in matching files for {source}-{name}.
+                Check if dataset file follows structure <source>-<name>-0-<end_timestamp>.parquet
+            """)
+            
+        return latest_file
 
     def _get_cache_key(
         self,
