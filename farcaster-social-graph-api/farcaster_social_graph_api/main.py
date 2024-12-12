@@ -1,3 +1,4 @@
+from typing import Union
 from fastapi import FastAPI, HTTPException, BackgroundTasks
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -101,9 +102,8 @@ async def shutdown_event():
     logging.info("Scheduler shut down.")
 
 
-@app.get("/check-sybil/{fid}")
-async def check_sybil(fid: int):
-    try:
+def get_sybil_probability_sybilscar(fid:int)->Union[float,None]:
+    try: 
         result_path = config.DOWNLOAD_DATA_PATH + "/sybil_scar_results.parquet"
         lazy_df = pl.scan_parquet(result_path)
 
@@ -114,15 +114,50 @@ async def check_sybil(fid: int):
         )
 
         if sybil_df.is_empty():
-            return {"fid": fid, "result": "Not Found"}
+            return None
 
         posterior_value = sybil_df[0, "posterior"]
+        if posterior_value is None:
+            return None
+        return 1 - posterior_value
+    
+    except Exception as e:
+        logging.error(f"Error getting SybilSCAR result for fid = {fid}: {e}")
+        return None
+
+def get_sybil_probability_ml_model(fid:int)->Union[float,None]:
+    try: 
+        return detector.predict(identifier=fid)["probability"]
+    except Exception as e:
+        logging.error(f"Error getting ML model result for fid = {fid}: {e}")
+        return None
+
+
+@app.get("/check-sybil/{fid}")
+async def check_sybil(fid: int):
+    try:
+        sybilscar_result = get_sybil_probability_sybilscar(fid)
+        ml_model_result = get_sybil_probability_ml_model(fid)
+        print("ml_model_result:",ml_model_result)
+
+        if (sybilscar_result is None) and (ml_model_result is None):
+            return {
+                "fid":fid,
+                "result":None,
+                "numeric_result":None,
+                "message":"Couldn't compute sybil probability for this user"
+            }
         
-        detector_prediction = detector.predict(identifier=fid)["probability"]
-        mean = ((1-posterior_value) + detector_prediction)/2
+        if (sybilscar_result is None):
+            mean = ml_model_result
+        elif (ml_model_result is None):
+            mean = sybilscar_result
+        else:
+            mean = (sybilscar_result + ml_model_result)/2
+
         is_benign = mean < 0.5
 
-        return {"fid": fid, "result": "benign" if is_benign else "sybil", "numeric_result":mean}
+        return {"fid": fid, "result": "benign" if is_benign else "sybil", "numeric_result":round(mean,4), "message":""}
 
     except Exception as e:
         # honeybadger.notify(e)
