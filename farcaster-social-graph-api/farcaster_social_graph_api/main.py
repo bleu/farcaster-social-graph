@@ -69,25 +69,25 @@ scheduler = AsyncIOScheduler()
 async def startup_event():
     """Schedule the cron jobs and start sync_lbo_data when the app starts."""
     try:
-        # asyncio.create_task(sync_lbp_data())
-        # asyncio.create_task(delete_old_files())
+        asyncio.create_task(sync_lbp_data())
+        asyncio.create_task(delete_old_files())
 
-        # scheduler.add_job(
-        #     sync_lbp_data,
-        #     CronTrigger(day_of_week="tue", hour="0", minute="0"),
-        #     id="sync_lbp_data",
-        #     replace_existing=True,
-        # )
+        scheduler.add_job(
+            sync_lbp_data,
+            CronTrigger(day_of_week="tue", hour="0", minute="0"),
+            id="sync_lbp_data",
+            replace_existing=True,
+        )
 
-        # scheduler.add_job(
-        #     delete_old_files,
-        #     CronTrigger(hour="0", minute="0"),
-        #     id="delete_old_files",
-        #     replace_existing=True,
-        # )
+        scheduler.add_job(
+            delete_old_files,
+            CronTrigger(hour="0", minute="0"),
+            id="delete_old_files",
+            replace_existing=True,
+        )
 
-        # logging.info(f"Scheduler started. Jobs: {scheduler.get_jobs()}")
-        # scheduler.start()
+        logging.info(f"Scheduler started. Jobs: {scheduler.get_jobs()}")
+        scheduler.start()
         pass
     except Exception as e:
         # honeybadger.notify(e)
@@ -127,7 +127,3 @@ async def check_sybil(fid: int):
     except Exception as e:
         # honeybadger.notify(e)
         raise HTTPException(status_code=500, detail=str(e))
-    
-@app.get("/test")
-async def test():
-    return {"test": "api-is-working"}
