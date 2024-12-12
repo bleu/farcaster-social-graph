@@ -6,15 +6,17 @@ authors = ["devjoaov <joaovictorass95@gmail.com>"]
 readme = "README.md"
 
 [tool.poetry.dependencies]
-python = "^3.11"
+python = "3.12.8"
 fastapi = "^0.115.0"
 uvicorn = "^0.31.1"
 aiofiles = "^24.1.0"
 aioboto3 = "^13.1.1"
-polars = "0.20.31"
-numpy = "^2.1.2"
+polars = "1.16.0"
+numpy = "2.0.2"
 honeybadger = "^0.20.2"
 apscheduler = "^3.10.4"
+scikit-learn = "1.5.2"
+farcaster-sybil-detection = {path = "../farcaster-sybil-detection"}
 
 [tool.poetry.group.dev.dependencies]
 ruff = "^0.6.9"
