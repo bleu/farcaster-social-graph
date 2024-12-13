@@ -176,11 +176,11 @@ class TemporalBehaviorExtractor(FeatureExtractor):
             .group_by("fid")
             .agg(
                 [
-                    pl.n_unique("parent_url").alias("unique_channels"),
-                    (pl.n_unique("parent_url") / pl.count()).alias(
+                    pl.n_unique("parent_url").cast(pl.Float64).alias("unique_channels"),
+                    (pl.n_unique("parent_url") / pl.count()).cast(pl.Float64).alias(
                         "cross_channel_activity"
                     ),
-                    (pl.col("parent_url").is_not_null().sum() / pl.count()).alias(
+                    (pl.col("parent_url").is_not_null().sum() / pl.count()).cast(pl.Float64).alias(
                         "multi_channel_ratio"
                     ),
                 ]
@@ -199,21 +199,21 @@ class TemporalBehaviorExtractor(FeatureExtractor):
             casts.with_columns(
                 [
                     pl.col("timestamp").cast(pl.Datetime),
-                    pl.col("timestamp").dt.hour().alias("hour"),
-                    pl.col("timestamp").dt.weekday().alias("weekday"),
+                    pl.col("timestamp").dt.hour().cast(pl.Float64).alias("hour"),
+                    pl.col("timestamp").dt.weekday().cast(pl.Float64).alias("weekday"),
                 ]
             )
             .group_by("fid")
             .agg(
                 [
-                    pl.col("hour").n_unique().alias("hour_diversity"),
-                    pl.col("weekday").n_unique().alias("weekday_diversity"),
-                    # pl.col("hour").mode().alias("peak_activity_hours"),
+                    pl.col("hour").n_unique().cast(pl.Float64).alias("hour_diversity"),
+                    pl.col("weekday").n_unique().cast(pl.Float64).alias("weekday_diversity"),
+                    # pl.col("hour").mode().cast(pl.Float64).alias("peak_activity_hours"),
                     (pl.col("timestamp").diff().dt.total_hours() > 24)
                     .sum()
-                    .alias("inactive_periods"),
-                    # pl.col("hour").value_counts().std().alias("activity_regularity"),
-                    pl.col("hour").n_unique().alias("daily_active_hours"),
+                    .cast(pl.Float64).alias("inactive_periods"),
+                    # pl.col("hour").value_counts().std().cast(pl.Float64).alias("activity_regularity"),
+                    pl.col("hour").n_unique().cast(pl.Float64).alias("daily_active_hours"),
                 ]
             )
             .with_columns([pl.col("fid").cast(pl.Int64)])
@@ -235,15 +235,15 @@ class TemporalBehaviorExtractor(FeatureExtractor):
                     .diff()
                     .dt.total_seconds()
                     .mean()
-                    .alias("avg_follow_latency_seconds"),
+                    .cast(pl.Float64).alias("avg_follow_latency_seconds"),
                     pl.col("timestamp").cast(pl.Datetime),
-                    pl.col("timestamp").dt.hour().alias("hour"),
-                    pl.col("timestamp").dt.weekday().alias("weekday"),
-                    pl.col("timestamp").diff().dt.total_hours().alias("hours_between"),
+                    pl.col("timestamp").dt.hour().cast(pl.Float64).alias("hour"),
+                    pl.col("timestamp").dt.weekday().cast(pl.Float64).alias("weekday"),
+                    pl.col("timestamp").diff().dt.total_hours().cast(pl.Float64).alias("hours_between"),
                     pl.col("timestamp")
                     .diff()
                     .dt.total_hours()
-                    .alias("time_diff"),  # Added
+                    .cast(pl.Float64).alias("time_diff"),  # Added
                 ]
             )
             .group_by("fid")
@@ -251,24 +251,24 @@ class TemporalBehaviorExtractor(FeatureExtractor):
                 [
                     pl.col("avg_follow_latency_seconds")
                     .mean()
-                    .alias("avg_follow_latency_seconds"),
-                    pl.count().alias("posting_frequency"),
-                    pl.col("time_diff").mean().alias("response_latency"),
-                    pl.col("time_diff").std().alias("interaction_timing"),
+                    .cast(pl.Float64).alias("avg_follow_latency_seconds"),
+                    pl.count().cast(pl.Float64).alias("posting_frequency"),
+                    pl.col("time_diff").mean().cast(pl.Float64).alias("response_latency"),
+                    pl.col("time_diff").std().cast(pl.Float64).alias("interaction_timing"),
                     pl.col("hours_between")
                     .filter(pl.col("hours_between") < 1)
                     .count()
-                    .alias("engagement_windows"),
+                    .cast(pl.Float64).alias("engagement_windows"),
                     # pl.col("hour")
                     # .value_counts()
                     # .filter(pl.col("count") > pl.col("count").mean())
                     # .count()
-                    # .alias("activity_cycles"),
+                    # .cast(pl.Float64).alias("activity_cycles"),
                     # pl.col("timestamp")
                     # .dt.weekday()
                     # .value_counts()
                     # .std()
-                    # .alias("seasonal_patterns"),
+                    # .cast(pl.Float64).alias("seasonal_patterns"),
                 ]
             )
             .with_columns([pl.col("fid").cast(pl.Int64)])
@@ -292,39 +292,39 @@ class TemporalBehaviorExtractor(FeatureExtractor):
                     .diff()
                     .dt.total_minutes()
                     .lt(5)
-                    .alias("is_burst"),
+                    .cast(pl.Boolean).alias("is_burst"),
                     pl.col("timestamp")
                     .diff()
                     .dt.total_minutes()
-                    .alias("minutes_between"),
+                    .cast(pl.Float64).alias("minutes_between"),
                 ]
             )
             .group_by("fid")
             .agg(
                 [
                     # Burst frequency
-                    pl.col("is_burst").sum().alias("burst_frequency"),
+                    pl.col("is_burst").sum().cast(pl.Float64).alias("burst_frequency"),
                     # Burst intensity (actions per burst)
                     (
                         pl.col("is_burst").sum()
                         / (pl.col("is_burst").sum() + 1)  # Prevent division by zero
-                    ).alias("burst_intensity"),
+                    ).cast(pl.Float64).alias("burst_intensity"),
                     # Burst duration (mean minutes between actions in bursts)
                     pl.col("minutes_between")
                     .filter(pl.col("is_burst"))
                     .mean()
-                    .alias("burst_duration"),
+                    .cast(pl.Float64).alias("burst_duration"),
                     # Inter-burst interval (mean minutes between bursts)
                     pl.col("minutes_between")
                     .filter(~pl.col("is_burst"))
                     .mean()
-                    .alias("inter_burst_interval"),
+                    .cast(pl.Float64).alias("inter_burst_interval"),
                     # Burst engagement ratio (proportion of actions in bursts)
-                    (pl.col("is_burst").sum() / pl.count()).alias(
+                    (pl.col("is_burst").sum() / pl.count()).cast(pl.Float64).alias(
                         "burst_engagement_ratio"
                     ),
                     # Burst impact (total bursts)
-                    pl.col("is_burst").sum().alias("burst_impact"),
+                    pl.col("is_burst").sum().cast(pl.Float64).alias("burst_impact"),
                 ]
             )
             .with_columns([pl.col("fid").cast(pl.Int64)])  # Added for consistency
@@ -342,23 +342,23 @@ class TemporalBehaviorExtractor(FeatureExtractor):
             casts.with_columns(
                 [
                     pl.col("timestamp").cast(pl.Datetime),
-                    pl.col("timestamp").dt.hour().alias("hour"),
-                    pl.col("timestamp").dt.weekday().alias("weekday"),
-                    pl.col("timestamp").diff().dt.total_hours().alias("hours_between"),
+                    pl.col("timestamp").dt.hour().cast(pl.Float64).alias("hour"),
+                    pl.col("timestamp").dt.weekday().cast(pl.Float64).alias("weekday"),
+                    pl.col("timestamp").diff().dt.total_hours().cast(pl.Float64).alias("hours_between"),
                 ]
             )
             .group_by("fid")
             .agg(
                 [
                     # Temporal consistency (std of hours_between)
-                    pl.col("hours_between").std().alias("temporal_consistency"),
+                    pl.col("hours_between").std().cast(pl.Float64).alias("temporal_consistency"),
                     # Engagement stability (removed due to missing action_type)
                     # pl.col("action_type")
                     #     .value_counts()
                     #     .std()
-                    #     .alias("engagement_stability"),
+                    #     .cast(pl.Float64).alias("engagement_stability"),
                     # Pattern predictability (std of hour counts)
-                    # pl.col("hour").value_counts().std().alias("pattern_predictability"),
+                    # pl.col("hour").value_counts().std().cast(pl.Float64).alias("pattern_predictability"),
                     # Rhythm score (number of unique hours)
                     pl.col("hour").n_unique().cast(pl.Float64).alias("rhythm_score"),
                     # Routine strength (count of weekdays with above-average activity)
@@ -366,12 +366,12 @@ class TemporalBehaviorExtractor(FeatureExtractor):
                     # .value_counts()
                     # .filter(pl.col("count") > pl.col("count").mean())
                     # .count()
-                    # .alias("routine_strength"),
+                    # .cast(pl.Float64).alias("routine_strength"),
                     # Variability index (difference between 90th and 10th percentiles)
                     (
                         pl.col("hours_between").quantile(0.9)
                         - pl.col("hours_between").quantile(0.1)
-                    ).alias("variability_index"),
+                    ).cast(pl.Float64).alias("variability_index"),
                 ]
             )
             .with_columns([pl.col("fid").cast(pl.Int64)])
@@ -389,8 +389,8 @@ class TemporalBehaviorExtractor(FeatureExtractor):
             casts.with_columns(
                 [
                     pl.col("timestamp").cast(pl.Datetime),
-                    pl.col("timestamp").dt.hour().alias("hour"),
-                    pl.col("timestamp").dt.weekday().alias("weekday"),
+                    pl.col("timestamp").dt.hour().cast(pl.Float64).alias("hour"),
+                    pl.col("timestamp").dt.weekday().cast(pl.Float64).alias("weekday"),
                 ]
             )
             .group_by("fid")
@@ -400,29 +400,29 @@ class TemporalBehaviorExtractor(FeatureExtractor):
                     (
                         pl.col("hour").is_between(9, 22).cast(pl.Float64).sum()
                         / pl.count()
-                    ).alias("prime_time_ratio"),
+                    ).cast(pl.Float64).alias("prime_time_ratio"),
                     # Off-hours activity (<9 AM or >10 PM)
                     (
                         (pl.col("hour").lt(9) | pl.col("hour").gt(22))
                         .cast(pl.Float64)
                         .sum()
                         / pl.count()
-                    ).alias("off_hours_activity"),
+                    ).cast(pl.Float64).alias("off_hours_activity"),
                     # Weekend activity ratio (Saturday and Sunday)
                     (
                         pl.col("weekday").is_in([5, 6]).cast(pl.Float64).sum()
                         / pl.count()
-                    ).alias("weekend_activity_ratio"),
+                    ).cast(pl.Float64).alias("weekend_activity_ratio"),
                     # Timezone alignment (number of peak activity hours)
                     # pl.col("hour")
                     # .value_counts()
                     # .filter(pl.col("count") > pl.col("count").mean())
                     # .count()
-                    # .alias("timezone_alignment"),
+                    # .cast(pl.Float64).alias("timezone_alignment"),
                     # Local time preference (mode hour)
-                    # pl.col("hour").mode().alias("local_time_preference"),
+                    # pl.col("hour").mode().cast(pl.Float64).alias("local_time_preference"),
                     # Global reach (unique hours / 24)
-                    (pl.col("hour").n_unique() / 24.0).alias("global_reach"),
+                    (pl.col("hour").n_unique() / 24.0).cast(pl.Float64).alias("global_reach"),
                 ]
             )
             .with_columns([pl.col("fid").cast(pl.Int64)])
@@ -443,11 +443,11 @@ class TemporalBehaviorExtractor(FeatureExtractor):
             casts.with_columns(
                 [
                     pl.col("timestamp").cast(pl.Datetime),
-                    pl.col("timestamp").dt.hour().alias("hour"),
+                    pl.col("timestamp").dt.hour().cast(pl.Float64).alias("hour"),
                 ]
             )
             .group_by(["fid", "hour"])
-            .agg([pl.count().alias("hour_count")])
+            .agg([pl.count().cast(pl.Float64).alias("hour_count")])
             .group_by("fid")
             .agg(
                 [
@@ -456,7 +456,7 @@ class TemporalBehaviorExtractor(FeatureExtractor):
                             (pl.col("hour_count") / pl.col("hour_count").sum())
                             * (pl.col("hour_count") / pl.col("hour_count").sum()).log(2)
                         ).sum()
-                    ).alias("activity_entropy")
+                    ).cast(pl.Float64).alias("activity_entropy")
                 ]
             )
         )
@@ -466,7 +466,7 @@ class TemporalBehaviorExtractor(FeatureExtractor):
             casts.with_columns(
                 [
                     pl.col("timestamp").cast(pl.Datetime),
-                    pl.col("timestamp").diff().dt.total_hours().alias("hours_between"),
+                    pl.col("timestamp").diff().dt.total_hours().cast(pl.Float64).alias("hours_between"),
                 ]
             )
             .group_by("fid")
@@ -478,18 +478,18 @@ class TemporalBehaviorExtractor(FeatureExtractor):
                         .filter(pl.col("hours_between") < 1)
                         .count()
                         / pl.count()
-                    ).alias("temporal_clustering"),
+                    ).cast(pl.Float64).alias("temporal_clustering"),
                     # Trend stability
                     pl.col("hours_between")
                     .rolling_std(window_size=24, min_periods=1)
                     .mean()
-                    .alias("trend_stability"),
+                    .cast(pl.Float64).alias("trend_stability"),
                     # Adaptation rate
                     pl.col("hours_between")
                     .rolling_mean(window_size=24, min_periods=1)
                     .diff()
                     .std()
-                    .alias("adaptation_rate"),
+                    .cast(pl.Float64).alias("adaptation_rate"),
                 ]
             )
         )
