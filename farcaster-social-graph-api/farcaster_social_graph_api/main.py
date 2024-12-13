@@ -47,10 +47,12 @@ pl.Config.set_streaming_chunk_size(1_000_000)
 pl.Config.set_fmt_str_lengths(50)
 
 detector_config = Config(
-    data_path=Path(f"{config.DOWNLOAD_DATA_PATH}/../../../data/raw"),
+    data_path=Path(config.DOWNLOAD_DATA_PATH),
     checkpoint_dir=Path(config.CHECKPOINTS_PATH),
-    model_dir=Path(f"{config.DOWNLOAD_DATA_PATH}/../../../notebooks/models"),
+    model_dir=Path(config.MODELS_PATH),
 )
+
+print(detector_config.data_path)
 
 registry = FeatureRegistry()
 
