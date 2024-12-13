@@ -13,6 +13,7 @@ import os
 import glob
 from farcaster_social_graph_api.config import config
 import logging
+import polars as pl
 
 
 async def sync_lbp_data():
@@ -20,11 +21,13 @@ async def sync_lbp_data():
     logging.info("Starting LBP data sync...")
 
     # approx 10 minutes
-    s3_importer = AsyncS3ParquetImporter(
-        s3_prefix="public-postgres/farcaster/v2/full/farcaster-links-"
-    )
-    file = await s3_importer.download_latest_file()
-    logging.info(f"Downloaded latest file: {file}")
+    s3_importer = AsyncS3ParquetImporter()
+    await s3_importer.download_latest_files()
+
+    logging.info(f"Downloaded files")
+
+async def run_sybilscar():
+    """Function to execute SybilSCAR pipeline."""
 
     # approx 1 minute
     farcaster_links_aggregator = FarcasterLinksAggregator()
@@ -43,11 +46,12 @@ async def sync_lbp_data():
 
 
 async def delete_old_files():
-    files_patterns = [
+    raw_patterns = [file.split("/")[-1] + "*.parquet" for file in config.FILES_TO_DOWNLOAD]
+    processed_patterns = [
         "processed-farcaster-undirected-connections-*.parquet",
-        "farcaster-links-*.parquet",
         "processed-farcaster-mutual-links-*.parquet",
     ]
+    files_patterns = raw_patterns + processed_patterns
 
     async def delete_pattern(file_pattern: str):
         files = await asyncio.to_thread(
@@ -55,9 +59,9 @@ async def delete_old_files():
         )
         files.sort(key=lambda x: os.path.getmtime(x), reverse=True)
 
-        # if there are more than 2 files, delete the older ones
-        if len(files) > 2:
-            old_files = files[2:]
+        # if there are more than 1 file, delete the older ones
+        if len(files) > 1:
+            old_files = files[1:]
             for old_file in old_files:
                 try:
                     await asyncio.to_thread(os.remove, old_file)
@@ -67,3 +71,39 @@ async def delete_old_files():
 
     callbacks = [delete_pattern(pattern) for pattern in files_patterns]
     await asyncio.gather(*callbacks)
+
+
+
+
+
+async def build_ml_model_feature_matrix(feature_manager):
+    file_pattern = "farcaster-fids-*.parquet"
+    parquet_files = await asyncio.to_thread(
+        glob.glob, os.path.join(config.DOWNLOAD_DATA_PATH, file_pattern)
+    )
+    if not parquet_files:
+        raise FileNotFoundError(f"No files found matching pattern: {file_pattern}")
+    parquet_files.sort()
+    farscaster_fids_file = parquet_files[-1]
+    
+    all_fids = pl.scan_parquet(farscaster_fids_file).select(["fid"]).collect()
+    all_fids = all_fids.with_columns(pl.col("fid").sort().alias("fid"))
+    n_fids = 130
+    sample_size = 30
+    # n_fids = len(all_fids) # uncomment this for production
+    # sample_size = config.SAMPLE_SIZE
+    current_fids = 0
+
+    while current_fids < n_fids:
+        start_index = current_fids
+        end_index = min(current_fids + sample_size, n_fids)
+        
+        # Get the batch of FIDs
+        fid_batch = all_fids["fid"][start_index:end_index].to_list()
+        
+        # Build features for this batch
+        feature_manager.build_feature_matrix(fid_batch)
+        
+        # Update progress
+        current_fids = end_index
+        logging.info(f"Processed {current_fids}/{n_fids} FIDs ({(current_fids/n_fids*100):.2f}%)")
