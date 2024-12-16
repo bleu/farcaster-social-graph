@@ -1,0 +1,6 @@
+notebooks/**/*
+data/**/*
+docker_data/**/*
+**/*.parquet
+!farcaster-social-graph-api/farcaster_social_graph_api/persisted_data/labels.parquet
+.git/**/*

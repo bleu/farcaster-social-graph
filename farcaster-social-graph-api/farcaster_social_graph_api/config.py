@@ -14,8 +14,8 @@ class Config:
     DATA_PATH = os.path.join(BASE_PATH, "../../data")
     DOWNLOAD_DATA_PATH = os.path.join(DATA_PATH, "raw")
     PERSISTED_DATA_PATH = os.path.join(DATA_PATH, "interim")
-    CHECKPOINTS_PATH = os.path.join(DATA_PATH,"checkpoints")
-    MODELS_PATH = os.path.join(DATA_PATH,"models")
+    CHECKPOINTS_PATH = os.path.join(DATA_PATH, "checkpoints")
+    MODELS_PATH = os.path.join(DATA_PATH, "models")
 
     # Environment configurations
     ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
@@ -47,7 +47,7 @@ class Config:
         "public-postgres/nindexer/v3/1/full/nindexer-follows-",
         "public-postgres/nindexer/v3/1/full/nindexer-neynar_user_scores-",
         "public-postgres/nindexer/v3/1/full/nindexer-profiles-",
-        "public-postgres/nindexer/v3/1/full/nindexer-verifications-"
+        "public-postgres/nindexer/v3/1/full/nindexer-verifications-",
     ]
 
 

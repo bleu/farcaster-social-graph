@@ -193,3 +193,9 @@ async def check_sybil(fid: int):
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/health")
+async def health():
+    # TODO: ideally also return what pct of the job is done
+    return {"status": "ok"}
