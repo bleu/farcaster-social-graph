@@ -15,6 +15,7 @@ builder:
     PYTHON_VERSION: 3.12.8
 
 proxy:
+  app_port: 8000
   healthcheck:
     interval: 3
     path: /health
