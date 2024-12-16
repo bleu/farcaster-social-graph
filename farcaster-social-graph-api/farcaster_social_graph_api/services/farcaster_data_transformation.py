@@ -136,12 +136,12 @@ class FarcasterUndirectedLinksBuilder(FarcasterBaseProcessor):
         #     (pl.col("fid_index").cast(pl.Utf8) + " " + pl.col("target_fid_index").cast(pl.Utf8)).alias("connection")
         # )
 
-        bot_or_not_df = pl.scan_parquet(
-            f"/{self.persisted_data_path}/bot_or_not_without_info.parquet"
+        labels_df = pl.scan_parquet(
+            f"/{self.persisted_data_path}/labels.parquet"
         )
 
         return mutual_links_with_index_concatenated.join(
-            bot_or_not_df, how="left", on="fid"
+            labels_df, how="left", on="fid"
         ).select("fid", "fid_index", "target_fid_index", "bot")
 
 

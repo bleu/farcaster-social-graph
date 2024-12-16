@@ -137,8 +137,9 @@ class UserIdentityExtractor(FeatureExtractor):
                 pl.col("display_name")
                 .str.len_chars()
                 .fill_null(0)
+                .cast(pl.Float64)
                 .alias("display_name_length"),
-                pl.col("bio").str.len_chars().fill_null(0).alias("bio_length"),
+                pl.col("bio").str.len_chars().fill_null(0).cast(pl.Int64).alias("bio_length"),
                 # Suspicious patterns in fname
                 pl.col("fname")
                 .str.contains(r"\d{4,}")
@@ -189,7 +190,7 @@ class UserIdentityExtractor(FeatureExtractor):
                     .str.explode()
                     .n_unique()
                     .truediv(pl.col("fname").str.len_chars() + 1)
-                ).alias("fname_entropy"),
+                ).cast(pl.Float64).alias("fname_entropy"),
                 (
                     pl.col("bio")
                     .str.replace_all(r"[^a-zA-Z0-9]", "")
@@ -197,7 +198,7 @@ class UserIdentityExtractor(FeatureExtractor):
                     .str.explode()
                     .n_unique()
                     .truediv(pl.col("bio").str.len_chars() + 1)
-                ).alias("bio_entropy"),
+                ).cast(pl.Float64).alias("bio_entropy"),
             ]
         ).with_columns(
             [
@@ -210,7 +211,7 @@ class UserIdentityExtractor(FeatureExtractor):
                         + pl.col("has_display_name")
                     )
                     / 4.0
-                ).alias("profile_completeness"),
+                ).cast(pl.Float64).alias("profile_completeness"),
             ]
         )
 
@@ -232,26 +233,31 @@ class UserIdentityExtractor(FeatureExtractor):
                 .group_by("fid")
                 .agg(
                     [
-                        pl.len().alias("total_verifications"),
+                        pl.len().cast(pl.Float64).alias("total_verifications"),
                         pl.col("claim")
                         .str.contains("ethSignature")
                         .sum()
+                        .cast(pl.Float64)
                         .alias("eth_verifications"),
                         pl.col("timestamp")
                         .diff()
                         .dt.total_hours()
                         .std()
+                        .cast(pl.Float64)
                         .alias("verification_timing_std"),
                         pl.col("timestamp")
                         .diff()
                         .dt.total_hours()
                         .mean()
+                        .cast(pl.Float64)
                         .alias("avg_hours_between_verifications"),
                         (pl.col("timestamp").diff().dt.total_hours() < 1)
                         .sum()
+                        .cast(pl.Float64)
                         .alias("sequential_verifications"),
                         (pl.col("timestamp").diff().dt.total_hours() > 24)
                         .sum()
+                        .cast(pl.Float64)
                         .alias("verification_gaps"),
                     ]
                 )
@@ -260,7 +266,7 @@ class UserIdentityExtractor(FeatureExtractor):
                         (
                             pl.col("verification_timing_std")
                             / (pl.col("avg_hours_between_verifications") + 1)
-                        ).alias("verification_consistency")
+                        ).cast(pl.Float64).alias("verification_consistency")
                     ]
                 )
             )
@@ -272,10 +278,11 @@ class UserIdentityExtractor(FeatureExtractor):
                 .group_by("fid")
                 .agg(
                     [
-                        pl.n_unique("platform").alias("platforms_verified"),
-                        pl.col("platform").n_unique().alias("platform_diversity"),
+                        pl.n_unique("platform").cast(pl.Float64).alias("platforms_verified"),
+                        pl.col("platform").n_unique().cast(pl.Float64).alias("platform_diversity"),
                         (pl.col("verified_at").max() - pl.col("verified_at").min())
                         .dt.total_days()
+                        .cast(pl.Float64)
                         .alias("verification_span_days"),
                         pl.len().cast(pl.Float64).alias("verification_velocity"),
                     ]
@@ -298,14 +305,14 @@ class UserIdentityExtractor(FeatureExtractor):
             .group_by("fid")
             .agg(
                 [
-                    pl.col("units").mean().alias("storage_units"),
-                    pl.col("units").max().alias("storage_utilization"),
-                    pl.len().alias("storage_update_frequency"),
-                    (pl.col("units").last() - pl.col("units").first()).alias(
+                    pl.col("units").mean().cast(pl.Float64).alias("storage_units"),
+                    pl.col("units").max().cast(pl.Float64).alias("storage_utilization"),
+                    pl.len().cast(pl.Float64).alias("storage_update_frequency"),
+                    (pl.col("units").last() - pl.col("units").first()).cast(pl.Float64).alias(
                         "storage_growth"
                     ),
-                    pl.col("units").std().alias("storage_stability"),
-                    (pl.col("units").mean() / pl.col("units").max()).alias(
+                    pl.col("units").std().cast(pl.Float64).alias("storage_stability"),
+                    (pl.col("units").mean() / pl.col("units").max()).cast(pl.Float64).alias(
                         "storage_efficiency"
                     ),
                 ]
@@ -314,7 +321,7 @@ class UserIdentityExtractor(FeatureExtractor):
                 [
                     (
                         pl.col("storage_growth") / pl.col("storage_update_frequency")
-                    ).alias("storage_growth_rate")
+                    ).cast(pl.Float64).alias("storage_growth_rate")
                 ]
             )
         )
@@ -329,7 +336,7 @@ class UserIdentityExtractor(FeatureExtractor):
                         + pl.col("verification_consistency").fill_null(0) * 0.3
                         + (pl.col("platforms_verified").fill_null(0) / 5.0) * 0.3
                     )
-                ).alias("identity_strength"),
+                ).cast(pl.Float64).alias("identity_strength"),
                 # Verification quality considers diversity and consistency
                 (
                     (
@@ -341,7 +348,7 @@ class UserIdentityExtractor(FeatureExtractor):
                         )
                         * 0.3
                     )
-                ).alias("verification_quality"),
+                ).cast(pl.Float64).alias("verification_quality"),
                 # Profile authenticity based on content analysis
                 (
                     1.0
@@ -352,7 +359,7 @@ class UserIdentityExtractor(FeatureExtractor):
                         + pl.col("bio_airdrop_terms").fill_null(0) * 0.2
                         + pl.col("bio_wallet_pattern").fill_null(0) * 0.2
                     )
-                ).alias("profile_authenticity"),
+                ).cast(pl.Float64).alias("profile_authenticity"),
                 # Resource utilization efficiency
                 (
                     (
@@ -361,6 +368,6 @@ class UserIdentityExtractor(FeatureExtractor):
                         + (1.0 - pl.col("storage_growth_rate").fill_null(0).clip(0, 1))
                         * 0.2
                     )
-                ).alias("resource_utilization"),
+                ).cast(pl.Float64).alias("resource_utilization"),
             ]
         )

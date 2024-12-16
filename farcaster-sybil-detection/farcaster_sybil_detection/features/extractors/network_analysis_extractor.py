@@ -131,15 +131,13 @@ class NetworkAnalysisExtractor(FeatureExtractor):
             .group_by("fid")
             .agg(
                 [
-                    pl.n_unique("target_url").alias("target_url_diversity"),
-                    # Calculate retention
-                    (1 - pl.col("deleted_at").is_not_null().sum() / pl.len()).alias(
+                    pl.n_unique("target_url").cast(pl.Int64).alias("target_url_diversity"),
+                    (1 - pl.col("deleted_at").is_not_null().sum() / pl.len()).cast(pl.Float64).alias(
                         "follower_retention"
                     ),
                 ]
             )
         )
-
     def _extract_derived_metrics(
         self, loaded_datasets: Dict[str, pl.LazyFrame]
     ) -> pl.LazyFrame:
@@ -152,23 +150,26 @@ class NetworkAnalysisExtractor(FeatureExtractor):
             .group_by("fid")
             .agg(
                 [
-                    pl.col("follower_count").log1p().alias("follower_ratio_log"),
+                    pl.col("follower_count").log1p().cast(pl.Float64).alias("follower_ratio_log"),
                     pl.col("unique_followers")
                     .log1p()
                     .alias("unique_follower_ratio_log"),
-                    pl.col("follow_velocity").log1p().alias("follow_velocity_log"),
+                    pl.col("follow_velocity").log1p().cast(pl.Float64).alias("follow_velocity_log"),
                 ]
             )
             .with_columns(
                 [
                     pl.col("follower_ratio")
                     .clip(0, pl.col("follower_ratio").quantile(0.99))
+                    .cast(pl.Float64)
                     .alias("follower_ratio_capped"),
                     pl.col("unique_follower_ratio")
                     .clip(0, pl.col("unique_follower_ratio").quantile(0.99))
+                    .cast(pl.Float64)
                     .alias("unique_follower_ratio_capped"),
                     pl.col("follow_velocity")
                     .clip(0, pl.col("follow_velocity").quantile(0.99))
+                    .cast(pl.Float64)
                     .alias("follow_velocity_capped"),
                 ]
             )
@@ -181,7 +182,7 @@ class NetworkAnalysisExtractor(FeatureExtractor):
                     1.0
                     - (pl.col("following_count") - pl.col("follower_count")).abs()
                     / (pl.col("following_count") + pl.col("follower_count") + 1)
-                ).alias("follower_authenticity_score")
+                ).cast(pl.Float64).alias("follower_authenticity_score")
             ]
         )
 
@@ -199,8 +200,8 @@ class NetworkAnalysisExtractor(FeatureExtractor):
         # Calculate outgoing connections (following)
         out_degree = follows_clean.group_by("fid").agg(
             [
-                pl.col("target_fid").count().alias("out_degree"),
-                pl.col("target_fid").n_unique().alias("unique_out_degree"),
+                pl.col("target_fid").count().cast(pl.Int64).alias("out_degree"),
+                pl.col("target_fid").n_unique().cast(pl.Int64).alias("unique_out_degree"),
             ]
         )
 
@@ -209,8 +210,8 @@ class NetworkAnalysisExtractor(FeatureExtractor):
             follows_clean.group_by("target_fid")
             .agg(
                 [
-                    pl.col("fid").count().alias("in_degree"),
-                    pl.col("fid").n_unique().alias("unique_in_degree"),
+                    pl.col("fid").count().cast(pl.Int64).alias("in_degree"),
+                    pl.col("fid").n_unique().cast(pl.Int64).alias("unique_in_degree"),
                 ]
             )
             .rename({"target_fid": "fid"})
@@ -219,33 +220,32 @@ class NetworkAnalysisExtractor(FeatureExtractor):
         # Join and calculate metrics
         return out_degree.join(in_degree, on="fid", how="outer").with_columns(
             [
-                # Normalize degrees by total network size
                 pl.col("out_degree").fill_null(0),
                 pl.col("in_degree").fill_null(0),
                 pl.col("unique_out_degree").fill_null(0),
                 pl.col("unique_in_degree").fill_null(0),
-                # Calculate centrality scores
                 (
                     (pl.col("out_degree") + pl.col("in_degree"))
                     / (pl.col("out_degree").max() + pl.col("in_degree").max())
                 )
                 .fill_null(0)
+                .cast(pl.Float64)
                 .alias("centrality_score"),
-                # Calculate bridging score
                 (
                     pl.col("unique_out_degree")
                     * pl.col("unique_in_degree")
                     / (pl.col("out_degree") + pl.col("in_degree") + 1)
                 )
                 .fill_null(0)
+                .cast(pl.Float64)
                 .alias("bridge_score"),
-                # Calculate clustering coefficient
                 (
                     pl.col("unique_out_degree")
                     * pl.col("unique_in_degree")
                     / ((pl.col("out_degree") + 1) * (pl.col("in_degree") + 1))
                 )
                 .fill_null(0)
+                .cast(pl.Float64)
                 .alias("clustering_coefficient"),
             ]
         )
@@ -264,19 +264,17 @@ class NetworkAnalysisExtractor(FeatureExtractor):
             .group_by("fid")
             .agg(
                 [
-                    # Basic counts
-                    pl.col("target_fid").count().alias("following_count"),
-                    pl.col("target_fid").n_unique().alias("unique_following"),
-                    # Calculate unique followers
+                    pl.col("target_fid").count().cast(pl.Int64).alias("following_count"),
+                    pl.col("target_fid").n_unique().cast(pl.Int64).alias("unique_following"),
                     pl.col("target_fid")
                     .filter(pl.col("target_fid").is_not_null())
                     .n_unique()
+                    .cast(pl.Int64)
                     .alias("unique_followers"),
-                    # Calculate ratios
                     (
                         pl.col("target_fid").count()
                         / (pl.col("target_fid").n_unique() + 1)
-                    ).alias("follow_ratio"),
+                    ).cast(pl.Float64).alias("follow_ratio"),
                 ]
             )
             .join(
@@ -297,7 +295,6 @@ class NetworkAnalysisExtractor(FeatureExtractor):
         if follows is None or follow_counts is None:
             return pl.DataFrame({"fid": []}).lazy()
 
-        # Process follows for growth metrics
         growth_features = (
             follows.filter(pl.col("deleted_at").is_null())
             .with_columns(
@@ -309,26 +306,24 @@ class NetworkAnalysisExtractor(FeatureExtractor):
             .group_by("fid")
             .agg(
                 [
-                    # Time-based metrics
                     (pl.col("timestamp").max() - pl.col("timestamp").min())
                     .dt.total_hours()
+                    .cast(pl.Float64)
                     .alias("network_age_hours"),
-                    # Growth rates
                     (
                         pl.col("timestamp").count()
                         / pl.col("timestamp").diff().dt.total_hours().mean()
-                    ).alias("follow_velocity"),
-                    # Stability metrics
+                    ).cast(pl.Float64).alias("follow_velocity"),
                     pl.col("timestamp")
                     .diff()
                     .dt.total_hours()
                     .std()
+                    .cast(pl.Float64)
                     .alias("growth_stability"),
                 ]
             )
         )
 
-        # Process follow counts for trending metrics
         count_features = (
             follow_counts.sort("created_at")
             .group_by("fid")
@@ -340,18 +335,18 @@ class NetworkAnalysisExtractor(FeatureExtractor):
                             - pl.col("follower_count").first()
                         )
                         / pl.col("follower_count").first()
-                    ).alias("follower_growth_rate"),
+                    ).cast(pl.Float64).alias("follower_growth_rate"),
                     (
                         (
                             pl.col("following_count").last()
                             - pl.col("following_count").first()
                         )
                         / pl.col("following_count").first()
-                    ).alias("following_growth_rate"),
+                    ).cast(pl.Float64).alias("following_growth_rate"),
                     (
                         pl.col("follower_count").diff().std()
                         + pl.col("following_count").diff().std()
-                    ).alias("network_growth_rate"),
+                    ).cast(pl.Float64).alias("network_growth_rate"),
                 ]
             )
         )
@@ -367,7 +362,6 @@ class NetworkAnalysisExtractor(FeatureExtractor):
         if follows is None:
             return pl.DataFrame({"fid": []}).lazy()
 
-        # Calculate reciprocal follows
         follows_clean = follows.filter(pl.col("deleted_at").is_null())
 
         reciprocal_follows = (
@@ -381,8 +375,8 @@ class NetworkAnalysisExtractor(FeatureExtractor):
             .group_by("fid")
             .agg(
                 [
-                    pl.count().alias("reciprocal_count"),
-                    (pl.count() / pl.col("target_fid").count()).alias(
+                    pl.count().cast(pl.Int64).alias("reciprocal_count"),
+                    (pl.count() / pl.col("target_fid").count()).cast(pl.Float64).alias(
                         "follow_reciprocity"
                     ),
                 ]
@@ -392,8 +386,8 @@ class NetworkAnalysisExtractor(FeatureExtractor):
         # Calculate network density and reach
         network_metrics = follows_clean.group_by("fid").agg(
             [
-                (pl.n_unique("target_fid") / pl.count()).alias("network_density"),
-                pl.col("target_fid").n_unique().alias("network_reach"),
+                (pl.n_unique("target_fid") / pl.count()).cast(pl.Float64).alias("network_density"),
+                pl.col("target_fid").n_unique().cast(pl.Int64).alias("network_reach"),
             ]
         )
 
@@ -408,9 +402,10 @@ class NetworkAnalysisExtractor(FeatureExtractor):
                 .group_by("fid")
                 .agg(
                     [
-                        pl.col("influence_score").mean().alias("influential_followers"),
+                        pl.col("influence_score").mean().cast(pl.Float64).alias("influential_followers"),
                         (pl.col("influence_score") > pl.col("influence_score").mean())
                         .sum()
+                        .cast(pl.Float64)
                         .alias("influencer_ratio"),
                     ]
                 )
@@ -440,25 +435,22 @@ class NetworkAnalysisExtractor(FeatureExtractor):
             .group_by("fid")
             .agg(
                 [
-                    # Calculate churn rate
-                    (pl.col("deleted_at").is_not_null().sum() / pl.len()).alias(
+                    (pl.col("deleted_at").is_not_null().sum() / pl.len()).cast(pl.Float64).alias(
                         "network_churn_rate"
                     ),
-                    # Calculate average relationship duration
                     (
                         pl.col("deleted_at").fill_null(pl.col("timestamp"))
                         - pl.col("created_at")
                     )
                     .dt.total_days()
-                    .mean()
+                    .cast(pl.Float64)
                     .alias("relationship_longevity"),
-                    # Calculate network volatility
                     pl.col("timestamp")
                     .diff()
                     .dt.total_hours()
                     .std()
+                    .cast(pl.Float64)
                     .alias("network_volatility"),
-                    # Calculate stable connections (lasting > 30 days)
                     (
                         (
                             pl.col("deleted_at").fill_null(pl.col("timestamp"))
@@ -467,6 +459,7 @@ class NetworkAnalysisExtractor(FeatureExtractor):
                         > 30
                     )
                     .sum()
+                    .cast(pl.Int64)
                     .alias("stable_connections"),
                 ]
             )
@@ -481,34 +474,22 @@ class NetworkAnalysisExtractor(FeatureExtractor):
 
         follows_clean = follows.filter(pl.col("deleted_at").is_null())
 
-        # Calculate network centrality
         centrality = follows_clean.group_by("fid").agg(
             [
-                # Degree centrality
-                (pl.len() + pl.col("target_fid").n_unique()).alias(
+                (pl.len() + pl.col("target_fid").n_unique()).cast(pl.Int64).alias(
                     "network_centrality"
                 ),
-                # Bridge score (connections between different communities)
-                pl.col("target_fid").n_unique().alias("bridge_score"),
+                pl.col("target_fid").n_unique().cast(pl.Int64).alias("bridge_score"),
             ]
         )
 
-        # Calculate community metrics
         community_metrics = follows_clean.group_by("fid").agg(
             [
-                # Community embedding strength
-                (pl.col("target_fid").n_unique() / pl.len()).alias(
+                (pl.col("target_fid").n_unique() / pl.len()).cast(pl.Float64).alias(
                     "community_embedding"
                 ),
-                # Network diversity
-                pl.col("target_fid").n_unique().alias("network_diversity"),
+                pl.col("target_fid").n_unique().cast(pl.Int64).alias("network_diversity"),
             ]
         )
 
         return centrality.join(community_metrics, on="fid", how="left")
-
-    def _get_default_features(self, df: pl.LazyFrame) -> pl.LazyFrame:
-        """Return DataFrame with default zero values for all features"""
-        return df.with_columns(
-            [pl.lit(0).alias(feature) for feature in self.feature_names]
-        )
