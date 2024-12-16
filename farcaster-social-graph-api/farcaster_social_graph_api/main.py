@@ -32,7 +32,15 @@ from farcaster_sybil_detection.features.extractors.user_identity_extractor impor
     UserIdentityExtractor,
 )
 
+
 # Global configurations
+
+logging.basicConfig(
+    level=logging.DEBUG,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    handlers=[logging.StreamHandler()],
+)
+
 pl.Config.set_streaming_chunk_size(1_000_000)
 pl.Config.set_fmt_str_lengths(50)
 
@@ -49,6 +57,8 @@ registry = FeatureRegistry()
 registry.register("user_identity", UserIdentityExtractor)
 registry.register("network_analysis", NetworkAnalysisExtractor)
 registry.register("temporal_behavior", TemporalBehaviorExtractor)
+# registry.register("content_engagement", ContentEngagementExtractor)
+# registry.register("reputation_meta", ReputationMetaExtractor)
 
 # Initialize detector
 detector = DetectorService(detector_config, registry)
@@ -163,6 +173,14 @@ async def check_sybil(fid: int):
             mean = sybilscar_result
         else:
             mean = (sybilscar_result + ml_model_result) / 2
+
+        if mean is None:
+            return {
+                "fid": fid,
+                "result": None,
+                "numeric_result": None,
+                "message": "Couldn't compute sybil probability for this user",
+            }
 
         is_benign = mean < 0.5
 
