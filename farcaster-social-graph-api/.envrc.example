@@ -3,5 +3,5 @@ export S3_FARCASTER_PARQUET_BUCKET_NAME=tf-premium-parquet
 export AWS_REGION=us-east-1
 export AWS_SECRET_ACCESS_KEY=
 export AWS_ACCESS_KEY_ID=
-export ENVIROMENT=development
+export ENVIRONMENT=development
 export HONEYBADGER_API_KEY=""
