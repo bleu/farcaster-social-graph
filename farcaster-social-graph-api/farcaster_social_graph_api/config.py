@@ -3,7 +3,6 @@ import os
 
 class Config:
     # AWS configurations
-    AWS_PROFILE = os.getenv("AWS_PROFILE")
     AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY")
     AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_ID")
     AWS_REGION = os.getenv("AWS_REGION")

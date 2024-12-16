@@ -31,7 +31,6 @@ servers:
 #
 env:
   secret:
-    - AWS_PROFILE
     - S3_FARCASTER_PARQUET_BUCKET_NAME
     - AWS_REGION
     - AWS_SECRET_ACCESS_KEY

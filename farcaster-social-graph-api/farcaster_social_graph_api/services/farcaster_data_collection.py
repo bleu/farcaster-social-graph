@@ -14,7 +14,6 @@ class AsyncS3ParquetImporter:
         self.s3_prefix = s3_prefix
         self.local_download_path = os.getenv("DOWNLOAD_PATH", "/data")
         self.session = aioboto3.Session(
-            profile_name=config.AWS_PROFILE,
             region_name=config.AWS_REGION,
             aws_access_key_id=config.AWS_ACCESS_KEY_ID,
             aws_secret_access_key=config.AWS_SECRET_ACCESS_KEY,
@@ -24,8 +23,8 @@ class AsyncS3ParquetImporter:
         try:
             async with self.session.client("s3") as s3:
                 response = await s3.list_objects_v2(
-                    Bucket=self.bucket_name, 
-                    Prefix=file_name if file_name else self.s3_prefix
+                    Bucket=self.bucket_name,
+                    Prefix=file_name if file_name else self.s3_prefix,
                 )
                 if "Contents" not in response:
                     raise ValueError(
@@ -51,9 +50,7 @@ class AsyncS3ParquetImporter:
         latest_file_key = await self.get_latest_file(file_name)
         file_name = latest_file_key.split("/")[-1]
         local_file_path = os.path.join(config.DOWNLOAD_DATA_PATH, file_name)
-        os.makedirs(
-            os.path.dirname(local_file_path), exist_ok=True
-        )
+        os.makedirs(os.path.dirname(local_file_path), exist_ok=True)
 
         if os.path.exists(local_file_path):
             logging.info(f"File {local_file_path} already exists! Skipping download...")
@@ -69,5 +66,8 @@ class AsyncS3ParquetImporter:
 
     async def download_latest_files(self) -> List[str]:
         """Download the latest files for multiple prefixes concurrently."""
-        tasks = [self.download_latest_file(file_name) for file_name in config.FILES_TO_DOWNLOAD]
+        tasks = [
+            self.download_latest_file(file_name)
+            for file_name in config.FILES_TO_DOWNLOAD
+        ]
         await asyncio.gather(*tasks)
