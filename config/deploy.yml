@@ -16,10 +16,10 @@ builder:
 
 proxy:
   app_port: 8000
-  # healthcheck:
-  #   interval: 3
-  #   path: /health
-  #   timeout: 3
+  healthcheck:
+    interval: 3
+    path: /health
+    timeout: 3
 
 volumes:
   - /data:/app/data
