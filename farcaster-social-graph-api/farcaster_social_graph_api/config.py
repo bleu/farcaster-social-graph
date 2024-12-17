@@ -21,7 +21,7 @@ class Config:
     DOWNLOAD_DATA_PATH = os.path.join(DATA_PATH, "raw")
     PERSISTED_DATA_PATH = os.path.join(DATA_PATH, "interim")
     CHECKPOINTS_PATH = os.path.join(DATA_PATH, "checkpoints")
-    MODELS_PATH = os.path.join(DATA_PATH, "models")
+    MODELS_PATH = os.path.join(BASE_PATH, "farcaster-social-graph-api/farcaster_social_graph_api/persisted_data")
 
     
 
