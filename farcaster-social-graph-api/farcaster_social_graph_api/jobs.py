@@ -76,7 +76,7 @@ async def delete_old_files():
 
 
 
-async def build_ml_model_feature_matrix(feature_manager):
+async def build_ml_model_feature_matrix(detector):
     file_pattern = "farcaster-fids-*.parquet"
     parquet_files = await asyncio.to_thread(
         glob.glob, os.path.join(config.DOWNLOAD_DATA_PATH, file_pattern)
@@ -102,8 +102,13 @@ async def build_ml_model_feature_matrix(feature_manager):
         fid_batch = all_fids["fid"][start_index:end_index].to_list()
         
         # Build features for this batch
-        feature_manager.build_feature_matrix(fid_batch)
+        detector.feature_manager.build_feature_matrix(fid_batch)
         
         # Update progress
         current_fids = end_index
         logging.info(f"Processed {current_fids}/{n_fids} FIDs ({(current_fids/n_fids*100):.2f}%)")
+    
+    # Retrain model
+    labels_df = pl.read_parquet(f"{config.MODELS_PATH}/labels.parquet")
+    detector.trainer.train(labels_df.to_csv())
+
