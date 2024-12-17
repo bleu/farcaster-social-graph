@@ -26,16 +26,19 @@ volumes:
 
 servers:
   web:
-    - 3.19.143.138
+    - 13.58.104.211
 
 # Inject ENV variables into containers (secrets come from .kamal/secrets).
 #
 env:
+  clear:
+    ENVIRONMENT: "production"
   secret:
     - S3_FARCASTER_PARQUET_BUCKET_NAME
     - AWS_REGION
     - AWS_SECRET_ACCESS_KEY
     - AWS_ACCESS_KEY_ID
+
 # Aliases are triggered with "bin/kamal <alias>". You can overwrite arguments on invocation:
 # "bin/kamal logs -r job" will tail logs from the first server in the job section.
 #

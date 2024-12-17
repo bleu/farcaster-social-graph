@@ -12,7 +12,8 @@ ENV PYTHONFAULTHANDLER=1 \
     POETRY_VIRTUALENVS_CREATE=false \
     POETRY_HOME="/opt/poetry" \
     PATH="/opt/poetry/bin:$PATH" \
-    PYTHONPATH="/app:$PYTHONPATH"
+    PYTHONPATH="/app:$PYTHONPATH" \
+    ENVIRONMENT="production"
 
 # Install system dependencies
 RUN apt-get update \
@@ -29,8 +30,8 @@ RUN curl -sSL https://install.python-poetry.org | python3 -
 WORKDIR /app
 
 # Create data directories with appropriate permissions
-RUN mkdir -p /data/raw /data/interim /data/checkpoints /data/models \
-    && chmod -R 777 /data
+RUN mkdir -p /app/data/raw /app/data/interim /app/data/checkpoints /app/data/models \
+    && chmod -R 777 /app/data
 
 # Copy the entire monorepo
 COPY . .
