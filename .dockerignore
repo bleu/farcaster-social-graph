@@ -1,8 +1,15 @@
 notebooks/**/*
-data/**/*
 docker_data/**/*
 **/*.parquet
 !farcaster-social-graph-api/farcaster_social_graph_api/persisted_data/labels.parquet
 !data/interim/labels.parquet
+data/*
+!data/interim/
+data/interim/*
+!data/interim/labels.parquet
+!data/models/
+data/models/*
+farcaster-sybil-detection/farcaster_sybil_detection/data/
+farcaster-social-graph-api/farcaster_social_graph_api/data/
 !data/models/model.pkl
 .git/**/*
