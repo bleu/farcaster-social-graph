@@ -28,5 +28,4 @@ Undirected_Facebook/
 docker_data/
 
 # Ignore data in farcaster-sybil-detection
-farcaster-sybil-detection/farcaster_sybil_detection/data/
 farcaster-social-graph-api/farcaster_social_graph_api/data/

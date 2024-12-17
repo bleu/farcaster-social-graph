@@ -9,7 +9,6 @@ data/interim/*
 !data/interim/labels.parquet
 !data/models/
 data/models/*
-farcaster-sybil-detection/farcaster_sybil_detection/data/
 farcaster-social-graph-api/farcaster_social_graph_api/data/
 !data/models/model.pkl
 .git/**/*
