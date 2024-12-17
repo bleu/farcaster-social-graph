@@ -21,8 +21,7 @@ proxy:
     path: /health
     timeout: 3
 
-deploy:
-  timeout: 7200 # 2 hours
+deploy_timeout: 7200 # 2 hours
 
 volumes:
   - /data:/app/data
