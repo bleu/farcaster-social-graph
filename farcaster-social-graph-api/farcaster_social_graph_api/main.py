@@ -2,6 +2,7 @@ import json
 import time
 from typing import Union
 from contextlib import asynccontextmanager
+from farcaster_sybil_detection.features.extractors.content_engagement_extractor import ContentEngagementExtractor
 from fastapi import FastAPI, HTTPException
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 import logging
@@ -57,7 +58,7 @@ registry = FeatureRegistry()
 registry.register("user_identity", UserIdentityExtractor)
 registry.register("network_analysis", NetworkAnalysisExtractor)
 registry.register("temporal_behavior", TemporalBehaviorExtractor)
-# registry.register("content_engagement", ContentEngagementExtractor)
+registry.register("content_engagement", ContentEngagementExtractor)
 # registry.register("reputation_meta", ReputationMetaExtractor)
 
 # Initialize detector
@@ -77,8 +78,8 @@ async def main_routine():
             return
 
     # await sync_lbp_data()
-    await delete_old_files()
-    await run_sybilscar()
+    # await delete_old_files()
+    # await run_sybilscar()
     await build_ml_model_feature_matrix(detector)
 
     # Log last time processed

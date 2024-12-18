@@ -88,10 +88,10 @@ async def build_ml_model_feature_matrix(detector):
     
     all_fids = pl.scan_parquet(farscaster_fids_file).select(["fid"]).collect()
     all_fids = all_fids.with_columns(pl.col("fid").sort().alias("fid"))
-    n_fids = 50
-    sample_size = 30
-    # n_fids = len(all_fids) # uncomment this for production
-    # sample_size = config.SAMPLE_SIZE
+    # n_fids = 50
+    # sample_size = 30
+    n_fids = len(all_fids) # uncomment this for production
+    sample_size = config.SAMPLE_SIZE
     current_fids = 0
 
     while current_fids < n_fids:
