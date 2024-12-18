@@ -109,6 +109,6 @@ async def build_ml_model_feature_matrix(detector):
         logging.info(f"Processed {current_fids}/{n_fids} FIDs ({(current_fids/n_fids*100):.2f}%)")
     
     # Retrain model
-    # labels_df = pl.read_parquet(f"{config.MODELS_PATH}/labels.parquet")
-    # detector.trainer.train(labels_df)
+    labels_df = pl.read_parquet(f"{config.MODELS_PATH}/labels.parquet")
+    detector.trainer.train(labels_df)
 
