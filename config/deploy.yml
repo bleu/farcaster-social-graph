@@ -28,7 +28,7 @@ volumes:
 
 servers:
   web:
-    - 3.134.109.78
+    - 18.118.148.23
 
 # Inject ENV variables into containers (secrets come from .kamal/secrets).
 #
