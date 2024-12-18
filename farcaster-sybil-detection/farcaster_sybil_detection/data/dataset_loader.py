@@ -29,33 +29,35 @@ class DatasetLoader(BaseDataLoader):
         """Get path for a dataset by finding the latest timestamp version."""
         if source not in ["farcaster", "nindexer"]:
             raise ValueError(f"Unknown dataset source: {source}")
-    
+
         # List all matching files
         pattern = f"{source}-{name}-*-*.parquet"
         matching_files = list(self.config.data_path.glob(pattern))
-        
+
         if not matching_files:
             raise ValueError(f"No dataset files found matching pattern: {pattern}")
-        
+
         # Extract timestamps and find latest
         latest_file = None
         latest_timestamp = 0
-        
+
         for file_path in matching_files:
             # Extract end timestamp from filename
-            match = re.search(r'-(\d+)\.parquet$', file_path.name)
+            match = re.search(r"-(\d+)\.parquet$", file_path.name)
             if match:
                 timestamp = int(match.group(1))
                 if timestamp > latest_timestamp:
                     latest_timestamp = timestamp
                     latest_file = file_path
-        
+
         if latest_file is None:
-            raise ValueError(f"""
+            raise ValueError(
+                f"""
                 No valid timestamps found in matching files for {source}-{name}.
                 Check if dataset file follows structure <source>-<name>-0-<end_timestamp>.parquet
-            """)
-            
+            """
+            )
+
         return latest_file
 
     def _get_cache_key(
@@ -125,7 +127,7 @@ class DatasetLoader(BaseDataLoader):
                 pl.count().alias("total_records"),
                 pl.col("fid").n_unique().alias("unique_fids"),
             ]
-        ).collect()
+        ).collect(engine="gpu")
 
         self.logger.debug(
             f"Filtered dataset: {stats[0]['total_records'][0]} records, {stats[0]['unique_fids'][0]} unique FIDs"
@@ -143,7 +145,7 @@ class DatasetLoader(BaseDataLoader):
         """Load dataset as DataFrame with filters applied"""
         # Use lazy loading and then collect
         lf = self.load_lazy_dataset(name, source, columns, fids)
-        df = lf.collect()
+        df = lf.collect(engine="gpu")
 
         self.logger.debug(f"Loaded {source}-{name}: {len(df)} records")
         return df

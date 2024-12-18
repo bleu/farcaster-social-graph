@@ -57,7 +57,7 @@ class FeatureExtractor(BaseFeatureExtractor):
                     ds.select(pl.count()).filter(pl.col("count") > 0)
                     for ds in loaded_datasets.values()
                 ]
-            ).collect()
+            ).collect(engine="gpu")
 
             if len(empty_check) == 0:
                 self.logger.warning("No data available in required datasets")

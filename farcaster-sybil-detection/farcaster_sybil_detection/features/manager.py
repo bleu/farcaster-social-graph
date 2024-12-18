@@ -159,7 +159,9 @@ class FeatureManager(IFeatureProvider):
                     .limit(self.config.sample_size)
                     .unique()
                 )
-                base_fids = feature_matrix.select("fid").collect()["fid"].to_list()
+                base_fids = (
+                    feature_matrix.select("fid").collect(engine="gpu")["fid"].to_list()
+                )
 
             self.logger.debug(f"Base FIDs: {len(base_fids)}")
             self.logger.debug(
@@ -172,14 +174,20 @@ class FeatureManager(IFeatureProvider):
                 missing_fids = base_fids
 
                 # Try to get cached result first
-                cached_features = self._get_cached_filtered_dataset(feature_name,base_fids)
+                cached_features = self._get_cached_filtered_dataset(
+                    feature_name, base_fids
+                )
 
                 if cached_features is not None:
                     self.logger.debug(f"Using cached features for {feature_name}")
                     # Find missing FIDs
-                    cached_fids = cached_features.select('fid').collect()['fid'].to_list()
+                    cached_fids = (
+                        cached_features.select("fid")
+                        .collect(engine="gpu")["fid"]
+                        .to_list()
+                    )
                     missing_fids = list(set(base_fids) - set(cached_fids))
-                    
+
                 if len(missing_fids) == 0:  # If no missing FIDs
                     feature_matrix = self._safe_join_features(
                         feature_matrix, cached_features, feature_name
@@ -187,12 +195,12 @@ class FeatureManager(IFeatureProvider):
                     continue
                 # Compute features only for missing FIDs
                 missing_features_lf = extractor_class(data_loader=self.data_loader).run(
-                    feature_matrix.filter(pl.col('fid').is_in(missing_fids)), 
-                    target_fids=missing_fids
+                    feature_matrix.filter(pl.col("fid").is_in(missing_fids)),
+                    target_fids=missing_fids,
                 )
-                
+
                 if missing_features_lf is not None:
-                    missing_features_df = missing_features_lf.collect()
+                    missing_features_df = missing_features_lf.collect(engine="gpu")
 
                     # Cache the new data
                     cache_key = self._get_filtered_dataset_cache_key(
@@ -201,24 +209,24 @@ class FeatureManager(IFeatureProvider):
                     self._cache_filtered_dataset(missing_features_df, cache_key)
 
                     # Combine cached and new features
-                    combined_features = pl.concat([
-                        cached_features.collect(),
-                        missing_features_df
-                    ]) if cached_features is not None else missing_features_df
-                    
-                    
+                    combined_features = (
+                        pl.concat(
+                            [cached_features.collect(engine="gpu"), missing_features_df]
+                        )
+                        if cached_features is not None
+                        else missing_features_df
+                    )
+
                     # Join with feature matrix
                     feature_matrix = self._safe_join_features(
-                        feature_matrix,
-                        combined_features.lazy(),
-                        feature_name
+                        feature_matrix, combined_features.lazy(), feature_name
                     )
 
                     self._log_memory(f"Completed {feature_name}")
 
             # Final collection
             self.logger.debug("Collecting final feature matrix")
-            result = feature_matrix.collect()
+            result = feature_matrix.collect(engine="gpu")
             self._log_memory("Feature matrix build completed")
 
             return result
@@ -253,33 +261,39 @@ class FeatureManager(IFeatureProvider):
         """Create cache key for filtered dataset"""
         fids_hash = hash(tuple(sorted(fids)))
         return f"{dataset_name}_filtered_{fids_hash}"
-    
-    def _cache_filtered_dataset(self,df,cache_key:str):
+
+    def _cache_filtered_dataset(self, df, cache_key: str):
         # Cache file with hash
         cache_path = self.config.checkpoint_dir / f"{cache_key}.parquet"
         df.write_parquet(cache_path)
-        
+
         hash = self._read_hash(cache_key)
         hashes_path = self.config.checkpoint_dir / "hashes.parquet"
 
         # If hashes file wasn't created yet
         if not os.path.exists(hashes_path):
-            hashes = pl.DataFrame({"fid":df["fid"],"hash":[hash]*len(df)})
+            hashes = pl.DataFrame({"fid": df["fid"], "hash": [hash] * len(df)})
             hashes.write_parquet(hashes_path)
             return
-        
+
         hashes_df = pl.read_parquet(hashes_path)
         if hash in hashes_df["hash"].to_list():
             return
-        hashes = pl.DataFrame({"fid":df["fid"],"hash":[hash]*len(df)})
-        new_hashes = pl.concat([hashes_df,hashes])
+        hashes = pl.DataFrame({"fid": df["fid"], "hash": [hash] * len(df)})
+        new_hashes = pl.concat([hashes_df, hashes])
         new_hashes.write_parquet(hashes_path)
 
-    def _get_cached_filtered_dataset(self, feature_name: str, fids: List[int]) -> Optional[pl.LazyFrame]:
+    def _get_cached_filtered_dataset(
+        self, feature_name: str, fids: List[int]
+    ) -> Optional[pl.LazyFrame]:
         """Try to get cached filtered dataset"""
 
         # 1. List current hashes for that feature name
-        files = [file for file in os.listdir(self.config.checkpoint_dir) if feature_name in file]
+        files = [
+            file
+            for file in os.listdir(self.config.checkpoint_dir)
+            if feature_name in file
+        ]
         hashes = [self._read_hash(file) for file in files]
         if len(hashes) == 0:
             return
@@ -290,10 +304,10 @@ class FeatureManager(IFeatureProvider):
         for file in files:
             fids_to_cache = (
                 pl.scan_parquet(self.config.checkpoint_dir / file)
-                    .select(["fid"])
-                    .collect()
-                    # Fids we want to get, excluding the ones we already got
-                    .filter(pl.col("fid").is_in(list(set(fids) - set(cached_fids))))
+                .select(["fid"])
+                .collect(engine="gpu")
+                # Fids we want to get, excluding the ones we already got
+                .filter(pl.col("fid").is_in(list(set(fids) - set(cached_fids))))
             )["fid"].to_list()
             cached_fids += fids_to_cache
             cached_fids_map[file] = fids_to_cache
@@ -302,13 +316,12 @@ class FeatureManager(IFeatureProvider):
         cached_dfs = []
         for file, cached_fids in cached_fids_map.items():
             cached_dfs.append(
-                pl.scan_parquet(self.config.checkpoint_dir / file)
-                .filter(pl.col("fid").is_in(cached_fids))
+                pl.scan_parquet(self.config.checkpoint_dir / file).filter(
+                    pl.col("fid").is_in(cached_fids)
+                )
             )
         final_lf = pl.concat(cached_dfs)
         return final_lf
-    
-    def _read_hash(self,cache_key:str):
+
+    def _read_hash(self, cache_key: str):
         return cache_key.split("_")[-1].split(".")[0]
-
-
