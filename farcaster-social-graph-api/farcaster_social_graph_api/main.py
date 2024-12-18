@@ -58,7 +58,7 @@ registry = FeatureRegistry()
 registry.register("user_identity", UserIdentityExtractor)
 registry.register("network_analysis", NetworkAnalysisExtractor)
 registry.register("temporal_behavior", TemporalBehaviorExtractor)
-registry.register("content_engagement", ContentEngagementExtractor)
+# registry.register("content_engagement", ContentEngagementExtractor)
 # registry.register("reputation_meta", ReputationMetaExtractor)
 
 # Initialize detector
