@@ -78,7 +78,7 @@ async def main_routine():
 
     await sync_lbp_data()
     await delete_old_files()
-    await run_sybilscar()
+    # await run_sybilscar()
     await build_ml_model_feature_matrix(detector)
 
     # Log last time processed
