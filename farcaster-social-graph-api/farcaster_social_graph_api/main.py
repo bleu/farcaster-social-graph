@@ -2,7 +2,6 @@ import json
 import time
 from typing import Union
 from contextlib import asynccontextmanager
-from farcaster_sybil_detection.features.extractors.content_engagement_extractor import ContentEngagementExtractor
 from fastapi import FastAPI, HTTPException
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 import logging
@@ -33,14 +32,17 @@ from farcaster_sybil_detection.features.extractors.user_identity_extractor impor
     UserIdentityExtractor,
 )
 
-
 # Global configurations
 
 logging.basicConfig(
-    level=logging.DEBUG,
+    level=logging.WARNING,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     handlers=[logging.StreamHandler()],
 )
+
+for logger_name in ["farcaster_social_graph_api", "farcaster_sybil_detection"]:
+    logger = logging.getLogger(logger_name)
+    logger.setLevel(logging.DEBUG)
 
 pl.Config.set_streaming_chunk_size(1_000_000)
 pl.Config.set_fmt_str_lengths(50)
