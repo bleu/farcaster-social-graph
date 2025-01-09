@@ -32,7 +32,7 @@ class NetworkAnalysisExtractor(FeatureExtractor):
             # "influencer_ratio",
             # Network stability
             "network_churn_rate",
-            "relationship_longevity",
+            #"relationship_longevity", ####
             "network_volatility",
             "stable_connections",
             # Advanced metrics
@@ -438,13 +438,13 @@ class NetworkAnalysisExtractor(FeatureExtractor):
                     (pl.col("deleted_at").is_not_null().sum() / pl.len()).cast(pl.Float64).alias(
                         "network_churn_rate"
                     ),
-                    (
-                        pl.col("deleted_at").fill_null(pl.col("timestamp"))
-                        - pl.col("created_at")
-                    )
-                    .dt.total_days()
-                    .cast(pl.Float64)
-                    .alias("relationship_longevity"),
+                    # (
+                    #     pl.col("deleted_at").fill_null(pl.col("timestamp"))
+                    #     - pl.col("created_at")
+                    # )
+                    # .dt.total_days()
+                    # .cast(pl.Float64)
+                    # .alias("relationship_longevity"),
                     pl.col("timestamp")
                     .diff()
                     .dt.total_hours()
