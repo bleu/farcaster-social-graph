@@ -1,22 +1,10 @@
-import json
-import time
 from typing import Union
-from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 import logging
-import os
 import polars as pl
 from pathlib import Path
-from apscheduler.triggers.cron import CronTrigger
-import asyncio
 
-from farcaster_social_graph_api.jobs import (
-    build_ml_model_feature_matrix,
-    sync_lbp_data,
-    delete_old_files,
-    run_sybilscar,
-)
 from farcaster_social_graph_api.config import config
 
 from farcaster_sybil_detection.config.defaults import Config
@@ -70,58 +58,40 @@ detector = DetectorService(detector_config, registry)
 scheduler = AsyncIOScheduler()
 
 
-async def main_routine():
-    if os.path.exists(f"{config.CHECKPOINTS_PATH}/checkpoint.json"):
-        with open(f"{config.CHECKPOINTS_PATH}/checkpoint.json", "r") as f:
-            last_time_processed = json.load(f)["last_timestamp"]
-        current_timestamp = round(time.time())
-        six_days = 60 * 60 * 24 * 6  # Almost job rerun time
-        if current_timestamp < last_time_processed + six_days:
-            return
+# @asynccontextmanager
+# async def lifespan(app: FastAPI):
+#     # Startup: Schedule jobs and run initial routine
+#     try:
+#         asyncio.create_task(main_routine())
 
-    await sync_lbp_data()
-    await delete_old_files()
-    await run_sybilscar()
-    await build_ml_model_feature_matrix(detector)
+#         scheduler.add_job(
+#             main_routine,
+#             CronTrigger(day_of_week="tue", hour="0", minute="0"),
+#             id="sync_lbp_data",
+#             replace_existing=True,
+#         )
 
-    # Log last time processed
-    current_timestamp = round(time.time())
-    with open(f"{config.CHECKPOINTS_PATH}/checkpoint.json", "w") as f:
-        json.dump({"last_timestamp": current_timestamp}, f)
+#         logging.info(f"Scheduler started. Jobs: {scheduler.get_jobs()}")
+#         scheduler.start()
+#     except Exception as e:
+#         logging.error(f"Error in scheduling jobs: {str(e)}")
+#         raise
 
+#     yield  # Application runs here
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    # Startup: Schedule jobs and run initial routine
-    try:
-        asyncio.create_task(main_routine())
-
-        scheduler.add_job(
-            main_routine,
-            CronTrigger(day_of_week="tue", hour="0", minute="0"),
-            id="sync_lbp_data",
-            replace_existing=True,
-        )
-
-        logging.info(f"Scheduler started. Jobs: {scheduler.get_jobs()}")
-        scheduler.start()
-    except Exception as e:
-        logging.error(f"Error in scheduling jobs: {str(e)}")
-        raise
-
-    yield  # Application runs here
-
-    # Shutdown: Clean up resources
-    try:
-        scheduler.shutdown()
-        logging.info("Scheduler shut down.")
-    except Exception as e:
-        logging.error(f"Error shutting down scheduler: {str(e)}")
+#     # Shutdown: Clean up resources
+#     try:
+#         scheduler.shutdown()
+#         logging.info("Scheduler shut down.")
+#     except Exception as e:
+#         logging.error(f"Error shutting down scheduler: {str(e)}")
 
 
 # Initialize FastAPI app with lifespan
 app = FastAPI(
-    title="Optimism Farcaster Social Graph API", version="0.1.0", lifespan=lifespan
+    title="Optimism Farcaster Social Graph API",
+    version="0.1.0",
+    # lifespan=lifespan
 )
 
 
