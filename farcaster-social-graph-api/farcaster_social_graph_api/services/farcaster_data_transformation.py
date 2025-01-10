@@ -1,7 +1,6 @@
 import os
 import glob
 import asyncio
-import aiofiles
 import polars as pl
 import time
 from farcaster_social_graph_api.config import config

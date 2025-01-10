@@ -1,9 +1,7 @@
 import random
-import math
 import os
 import glob
 from collections import defaultdict
-from typing import Set, Dict, Tuple, List
 import polars as pl
 import time
 from farcaster_social_graph_api.config import config

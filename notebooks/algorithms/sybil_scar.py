@@ -2,7 +2,6 @@ import random
 import threading
 from collections import defaultdict
 import numpy as np
-import argparse
 
 class Data:
     def __init__(self):

@@ -1,4 +1,3 @@
-import random
 from sklearn.model_selection import ParameterSampler
 from sybil_scar import Data
 from metrics import Metrics
