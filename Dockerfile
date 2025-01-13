@@ -45,4 +45,4 @@ RUN poetry run prisma generate
 WORKDIR /app/farcaster-social-graph-api
 
 # Set the default command
-CMD ["poetry", "run", "python", "farcaster_social_graph_api/jobs.py", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["poetry", "run", "python", "farcaster_social_graph_api/jobs.py"]
