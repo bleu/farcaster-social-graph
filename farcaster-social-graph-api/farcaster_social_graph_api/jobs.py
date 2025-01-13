@@ -303,25 +303,27 @@ detector = DetectorService(detector_config, registry)
 
 
 async def main_routine():
-    if os.path.exists(f"{config.CHECKPOINTS_PATH}/checkpoint.json"):
-        with open(f"{config.CHECKPOINTS_PATH}/checkpoint.json", "r") as f:
-            last_time_processed = json.load(f)["last_timestamp"]
+    try:
+        if os.path.exists(f"{config.CHECKPOINTS_PATH}/checkpoint.json"):
+            with open(f"{config.CHECKPOINTS_PATH}/checkpoint.json", "r") as f:
+                last_time_processed = json.load(f)["last_timestamp"]
+            current_timestamp = round(time.time())
+            six_days = 60 * 60 * 24 * 6  # Almost job rerun time
+            if current_timestamp < last_time_processed + six_days:
+                return
+
+        # await remove_old_files()
+        # await sync_lbp_data()
+        # await run_sybilscar()
+        # await build_ml_model_feature_matrix(detector)
+        await post_outputs_to_db()
+
+        # Log last time processed
         current_timestamp = round(time.time())
-        six_days = 60 * 60 * 24 * 6  # Almost job rerun time
-        if current_timestamp < last_time_processed + six_days:
-            return
-
-    # await remove_old_files()
-    # await sync_lbp_data()
-    # await run_sybilscar()
-    # await build_ml_model_feature_matrix(detector)
-    await post_outputs_to_db()
-
-    # Log last time processed
-    current_timestamp = round(time.time())
-    with open(f"{config.CHECKPOINTS_PATH}/checkpoint.json", "w") as f:
-        json.dump({"last_timestamp": current_timestamp}, f)
-
+        with open(f"{config.CHECKPOINTS_PATH}/checkpoint.json", "w") as f:
+            json.dump({"last_timestamp": current_timestamp}, f)
+    except Exception as e:
+        print("Error in main routine:",e)
 
 if __name__ == "__main__":
     asyncio.run(main_routine())
