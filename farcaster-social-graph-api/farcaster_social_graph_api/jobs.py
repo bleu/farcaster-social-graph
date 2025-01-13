@@ -311,10 +311,10 @@ async def main_routine():
         if current_timestamp < last_time_processed + six_days:
             return
 
-    await remove_old_files()
-    await sync_lbp_data()
-    await run_sybilscar()
-    await build_ml_model_feature_matrix(detector)
+    # await remove_old_files()
+    # await sync_lbp_data()
+    # await run_sybilscar()
+    # await build_ml_model_feature_matrix(detector)
     await post_outputs_to_db()
 
     # Log last time processed

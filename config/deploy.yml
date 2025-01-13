@@ -14,13 +14,6 @@ builder:
   args:
     PYTHON_VERSION: 3.12.8
 
-proxy:
-  app_port: 8000
-  healthcheck:
-    interval: 3
-    path: /health
-    timeout: 3
-
 deploy_timeout: 7200 # 2 hours
 
 volumes:
