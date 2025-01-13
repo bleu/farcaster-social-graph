@@ -244,7 +244,7 @@ class FeatureManager(IFeatureProvider):
         """Get list of available features"""
         features = set()
         for extractor in self.get_enabled_extractors().values():
-            features.update(extractor.feature_names)
+            features.update(extractor.get_feature_names())
         return sorted(list(features))
 
     def _get_filtered_dataset_cache_key(
