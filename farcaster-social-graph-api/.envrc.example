@@ -5,3 +5,4 @@ export AWS_SECRET_ACCESS_KEY=
 export AWS_ACCESS_KEY_ID=
 export ENVIRONMENT=development
 export HONEYBADGER_API_KEY=""
+export DATABASE_URL=""

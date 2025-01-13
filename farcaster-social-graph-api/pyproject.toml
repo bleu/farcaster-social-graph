@@ -17,6 +17,7 @@ honeybadger = "^0.20.2"
 apscheduler = "^3.10.4"
 scikit-learn = "1.5.2"
 farcaster-sybil-detection = {path = "../farcaster-sybil-detection"}
+prisma = "^0.15.0"
 
 [tool.poetry.group.dev.dependencies]
 ruff = "^0.6.9"

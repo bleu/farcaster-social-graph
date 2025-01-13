@@ -1,0 +1,36 @@
+generator py {
+  provider = "prisma-client-py"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Report {
+  id               Int        @id @default(autoincrement())
+  reporterFid      BigInt     @map("reporter_fid")
+  targetFid        BigInt     @map("target_fid")
+  castHash         String?    @map("cast_hash") @db.Char(42)
+  messageHash      String?    @map("message_hash") @db.Char(42)
+  network          Int?
+  reportedAsSybil  Boolean    @map("reported_as_sybil") @db.Boolean
+  sybilProbability Float?     @map("sybil_probability") @db.Real
+  attestation      Json?      @map("attestation") @db.JsonB
+  reportTimestamp  DateTime?  @map("report_timestamp") @db.Timestamp(6)
+  createdAt        DateTime?  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([targetFid])
+  @@index([reporterFid])
+  @@map("reports")
+}
+
+model SybilProbability {
+  fid              BigInt      @id @map("fid")
+  fname            String?      @map("fname")
+  sybilProbability Float?      @map("sybil_probability") @db.Real
+  sybilDiagnosis   Boolean?    @map("sybil_diagnosis") @db.Boolean
+  lastUpdated      DateTime    @default(now()) @map("last_updated") @db.Timestamptz(6)
+
+  @@map("sybil_probabilities")
+}
