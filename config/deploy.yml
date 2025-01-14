@@ -20,8 +20,15 @@ volumes:
   - /data:/app/data
 
 servers:
-  web:
+  worker:
     - 18.217.93.54
+
+healthcheck:
+  type: script
+  command: "pgrep -f 'python.*jobs.py'"
+  interval: 30
+  timeout: 10
+  max_attempts: 5
 
 # Inject ENV variables into containers (secrets come from .kamal/secrets).
 #
