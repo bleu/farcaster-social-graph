@@ -19,9 +19,13 @@ deploy_timeout: 7200 # 2 hours
 volumes:
   - /data:/app/data
 
+primary_role: job
+
 servers:
-  worker:
-    - 18.217.93.54
+  job:
+    hosts:
+      - 18.217.93.54
+    proxy: false
 
 # Inject ENV variables into containers (secrets come from .kamal/secrets).
 #
