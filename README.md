@@ -2,7 +2,7 @@
 
 This project develops a sybil detection system for the Farcaster social network by combining two approaches: the SybilSCAR social graph algorithm and a custom machine learning model. By analyzing both network topology and user behavior data obtained through Neynar's API, our solution provides accurate probability scores identifying potential sybil accounts.
 
-A public API is available for developers to integrate these detection capabilities into their own applications. Additionally, we've implemented a Farcaster Frame allowing users to interact with the detection system directly within the Farcaster ecosystem. For implementation details, code examples, and documentation, explore this repository.
+A public API is available for developers to integrate these detection capabilities into their own applications. Additionally, we've implemented a Farcaster Frame allowing users to interact with the detection system directly within the Farcaster ecosystem. For implementation details, code examples, and documentation, explore [this repository](https://github.com/bleu/op-report-sybil-farcaster-frame).
 
 ## Model documentation
 
@@ -60,13 +60,13 @@ In order to inspect if the results make sense outside the labeled samples, it's 
 
 **Farcaster**
 
-To see the last timestamp:
+To check latest timestamps:
 
 ```bash
 aws s3 ls s3://tf-premium-parquet/public-postgres/farcaster/v2/full/
 ```
 
-To download data for that timestamp:
+To download data for a timestamp:
 
 ```bash
 aws s3 cp s3://tf-premium-parquet/public-postgres/farcaster/v2/full/ ./data/raw --recursive --exclude "*" --include "*-<end_timestamp>.parquet"
@@ -74,13 +74,13 @@ aws s3 cp s3://tf-premium-parquet/public-postgres/farcaster/v2/full/ ./data/raw 
 
 **Nindexer**
 
-To check most updated timestamps
+To check latest timestamps:
 
 ```bash
 aws s3 ls s3://tf-premium-parquet/public-postgres/nindexer/v3/1/full/
 ```
 
-To download it
+To download data for a timestamp:
 
 ```bash
 aws s3 cp s3://tf-premium-parquet/public-postgres/nindexer/v3/1/full/ data/raw --recursive  --exclude "*"  --include "*-<end_timestamp>.parquet" --profile neynar_parquet_exports
@@ -89,9 +89,15 @@ aws s3 cp s3://tf-premium-parquet/public-postgres/nindexer/v3/1/full/ data/raw -
 #### Install dependencies
 
 ```bash
+cd farcaster-social-graph-api
 poetry install
 ```
 
 #### Test the algorithm
 
-The notebook `notebooks/22-get-auc-of-ensembled-test.ipynb` showcases an example of the algorithm usage
+The main routine can be called using:
+```bash
+poetry run python farcaster_social_graph_api/jobs.py
+```
+
+Also, the folder `notebooks` contains several intermediate steps and experiments. The notebook `notebooks/22-get-auc-of-ensembled-test.ipynb` showcases an example of the algorithm usage.
