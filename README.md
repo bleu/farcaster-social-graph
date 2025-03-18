@@ -46,11 +46,13 @@ The main success metric observed in this project is the ROC AUC score. Here is a
 | Machine Learning | 0.9899        |
 | Final ensemble   | 0.9922        |
 
-![ML sybil probabilities distribution]()
+In order to inspect if the results make sense outside the labeled samples, it's possible to check the probability distribution on all users:
 
-![SybilSCAR sybil probabilities distribution]()
+![ML sybil probabilities distribution](https://github.com/user-attachments/assets/c718eda6-c024-4d12-88ae-7b8f6ea072e2)
 
-![Ensembled sybil probabilities distribution]()
+![SybilSCAR sybil probabilities distribution](https://github.com/user-attachments/assets/a079bc8c-6c53-4f01-b9a2-100f51dd1af2)
+
+![Ensembled sybil probabilities distribution](https://github.com/user-attachments/assets/05ce86b0-44b7-410b-9ae1-12cbff93b754)
 
 ## Usage
 
