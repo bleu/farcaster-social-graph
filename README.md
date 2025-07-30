@@ -56,6 +56,11 @@ In order to inspect if the results make sense outside the labeled samples, it's 
 
 ## Usage
 
+#### Requirements
+
+- python v3.12
+- poetry
+
 #### Download Neynar data
 
 **Farcaster**
@@ -86,12 +91,49 @@ To download data for a timestamp:
 aws s3 cp s3://tf-premium-parquet/public-postgres/nindexer/v3/1/full/ data/raw --recursive  --exclude "*"  --include "*-<end_timestamp>.parquet" --profile neynar_parquet_exports
 ```
 
-#### Install dependencies
+#### Prepare enviroment
+
+Go to notebooks:
+```bash
+cd notebooks
+```
+
+Install dependencies:
 
 ```bash
 cd farcaster-social-graph-api
 poetry install
 ```
+
+Activate environment:
+```bash
+poetry shell
+python -m ipykernel install --user --name farcaster_social_graph
+```
+
+#### Notebooks overview
+
+**Bot or Not data extraction and evaluation**:
+- `notebooks/01-merge-data.ipynb`
+- `notebooks/02-extract-bot-or-not-checks.ipynb`
+- `notebooks/10-evaluate-bot-or-not-quality.ipynb`
+
+**Benign labeling process**:
+- `notebooks/11-test-verifications-to-get-human-labels.ipynb`
+- `notebooks/12-manual-human-labeling.ipynb`
+
+**SybilSCAR test**:
+- `notebooks/13-inspect-sybilscar-result.ipynb`
+
+**Machine learning model development and tests**:
+- `notebooks/14-explore-features.ipynb`
+- `notebooks/15-consolidate-features.ipynb`
+- `notebooks/16-add-new-features.ipynb`
+- `notebooks/17-apply-self-training.ipynb`
+
+**Final model tests**:
+- `notebooks/22-get-auc-of-ensembled-test.ipynb`
+- `notebooks/23-inspect-model-outputs.ipynb`
 
 #### Test the algorithm
 
@@ -99,5 +141,14 @@ The main routine can be called using:
 ```bash
 poetry run python farcaster_social_graph_api/jobs.py
 ```
+It may take some minutes to run.
 
-Also, the folder `notebooks` contains several intermediate steps and experiments. The notebook `notebooks/22-get-auc-of-ensembled-test.ipynb` showcases an example of the algorithm usage.
+
+## Useful links:
+
+[Project proposal on charmverse](https://app.charmverse.io/op-grants/farcaster-social-graph-13991200096869738)
+[Project documentation](https://www.notion.so/bleu-builders/Farcaster-Social-Graph-Documentation-13bc4ae7dcbd80418174f7312354cfea?source=copy_link)
+[Report Sybil - Farcaster frame](https://github.com/bleu/op-report-sybil-farcaster-frame)
+
+
+
