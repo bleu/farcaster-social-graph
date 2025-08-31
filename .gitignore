@@ -23,3 +23,8 @@ notebooks/logs
 Undirected_Farcaster/
 Undirected_Facebook/
 docker_data/
+
+/node_modules/**/*
+/jobs-infra-cdk/node_modules/**/*
+/jobs-infra-cdk/cdk.out/**/*
+node_modules
