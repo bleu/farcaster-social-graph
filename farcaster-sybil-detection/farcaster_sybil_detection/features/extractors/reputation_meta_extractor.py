@@ -71,10 +71,10 @@ class ReputationMetaExtractor(FeatureExtractor):
 
     def get_required_datasets(self) -> Dict[str, Dict]:
         return {
-            "neynar_user_scores": {
-                "columns": ["fid", "score", "created_at"],
-                "source": "nindexer",
-            },
+            # "neynar_user_scores": {
+            #     "columns": ["fid", "score", "created_at"],
+            #     "source": "nindexer",
+            # },
             "follow_counts": {
                 "columns": ["fid", "follower_count", "following_count", "created_at"],
                 "source": "nindexer",
@@ -132,7 +132,7 @@ class ReputationMetaExtractor(FeatureExtractor):
         self, loaded_datasets: Dict[str, pl.LazyFrame]
     ) -> pl.LazyFrame:
         verifications = loaded_datasets.get("verifications")
-        neynar_scores = loaded_datasets.get("neynar_user_scores")
+        # neynar_scores = loaded_datasets.get("neynar_user_scores")
 
         if verifications is None:
             return pl.DataFrame({"fid": []}).lazy()
@@ -158,31 +158,31 @@ class ReputationMetaExtractor(FeatureExtractor):
             )
         )
 
-        if neynar_scores is not None:
-            neynar_metrics = (
-                neynar_scores.sort("created_at")
-                .group_by("fid")
-                .agg(
-                    [
-                        pl.col("score").mean().alias("avg_neynar_score"),
-                        pl.col("score").std().alias("neynar_score_std"),
-                        pl.col("score").last().alias("neynar_score"),
-                        (pl.col("score").last() - pl.col("score").first()).alias(
-                            "score_trend"
-                        ),
-                        (pl.col("score").max() - pl.col("score").min()).alias(
-                            "score_divergence"
-                        ),
-                        (
-                            (pl.col("score").last() - pl.col("score").first())
-                            / pl.col("score").first()
-                        ).alias("relative_score_diff"),
-                    ]
-                )
-            )
-            verification_metrics = verification_metrics.join(
-                neynar_metrics, on="fid", how="left"
-            )
+        # if neynar_scores is not None:
+        #     neynar_metrics = (
+        #         neynar_scores.sort("created_at")
+        #         .group_by("fid")
+        #         .agg(
+        #             [
+        #                 pl.col("score").mean().alias("avg_neynar_score"),
+        #                 pl.col("score").std().alias("neynar_score_std"),
+        #                 pl.col("score").last().alias("neynar_score"),
+        #                 (pl.col("score").last() - pl.col("score").first()).alias(
+        #                     "score_trend"
+        #                 ),
+        #                 (pl.col("score").max() - pl.col("score").min()).alias(
+        #                     "score_divergence"
+        #                 ),
+        #                 (
+        #                     (pl.col("score").last() - pl.col("score").first())
+        #                     / pl.col("score").first()
+        #                 ).alias("relative_score_diff"),
+        #             ]
+        #         )
+        #     )
+            # verification_metrics = verification_metrics.join(
+            #     neynar_metrics, on="fid", how="left"
+            # )
 
         return verification_metrics.with_columns(
             [
@@ -196,26 +196,26 @@ class ReputationMetaExtractor(FeatureExtractor):
     def _extract_core_scores(
         self, loaded_datasets: Dict[str, pl.LazyFrame]
     ) -> pl.LazyFrame:
-        neynar_scores = loaded_datasets.get("neynar_user_scores")
+        # neynar_scores = loaded_datasets.get("neynar_user_scores")
         follow_counts = loaded_datasets.get("follow_counts")
 
         result = pl.DataFrame(schema={"fid": pl.Int64}).lazy()
 
         # Process Neynar scores
-        if neynar_scores is not None:
-            neynar_features = (
-                neynar_scores.sort("created_at")
-                .group_by("fid")
-                .agg(
-                    [
-                        pl.col("score").last().alias("neynar_score"),
-                        (pl.col("score").last() - pl.col("score").first())
-                        .truediv(pl.col("score").first())
-                        .alias("score_growth"),
-                    ]
-                )
-            )
-            result = result.join(neynar_features, on="fid", how="left")
+        # if neynar_scores is not None:
+        #     neynar_features = (
+        #         neynar_scores.sort("created_at")
+        #         .group_by("fid")
+        #         .agg(
+        #             [
+        #                 pl.col("score").last().alias("neynar_score"),
+        #                 (pl.col("score").last() - pl.col("score").first())
+        #                 .truediv(pl.col("score").first())
+        #                 .alias("score_growth"),
+        #             ]
+        #         )
+        #     )
+        #     result = result.join(neynar_features, on="fid", how="left")
 
         # Process user metrics
         if follow_counts is not None:

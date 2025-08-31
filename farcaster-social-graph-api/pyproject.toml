@@ -11,7 +11,7 @@ fastapi = "^0.115.0"
 uvicorn = "^0.31.1"
 aiofiles = "^24.1.0"
 aioboto3 = "^13.1.1"
-polars = "1.16.0"
+polars = { version = "^1.16.0", extras = ["py-arrow"] }
 numpy = "2.0.2"
 honeybadger = "^0.20.2"
 apscheduler = "^3.10.4"
