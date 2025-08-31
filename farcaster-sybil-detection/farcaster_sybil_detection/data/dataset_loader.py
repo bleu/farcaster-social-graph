@@ -120,16 +120,16 @@ class DatasetLoader(BaseDataLoader):
         self.logger.debug(f"Loading {name} with columns: {cols_to_load}")
 
         # Get filtered size without materializing
-        stats = lf.select(
-            [
-                pl.count().alias("total_records"),
-                pl.col("fid").n_unique().alias("unique_fids"),
-            ]
-        ).collect()
+        #stats = lf.select(
+        #    [
+        #        pl.count().alias("total_records"),
+        #        pl.col("fid").n_unique().alias("unique_fids"),
+        #    ]
+        #).collect()
 
-        self.logger.debug(
-            f"Filtered dataset: {stats[0]['total_records'][0]} records, {stats[0]['unique_fids'][0]} unique FIDs"
-        )
+        #self.logger.debug(
+        #    f"Filtered dataset: {stats[0]['total_records'][0]} records, {stats[0]['unique_fids'][0]} unique FIDs"
+        #)
 
         return lf
 

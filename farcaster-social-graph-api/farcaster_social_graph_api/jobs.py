@@ -5,6 +5,8 @@ import os
 import numpy as np
 import polars as pl
 from pathlib import Path
+import pyarrow as pa
+import pyarrow.parquet as pq
 
 from farcaster_social_graph_api.config import config
 
@@ -44,6 +46,72 @@ async def sync_lbp_data():
 
     logging.info("Downloaded files")
 
+async def preprocess_data():
+    """
+    Preprocess all parquet files in config.DOWNLOAD_DATA_PATH
+    by removing unwanted columns such as arrow.uuid, arrow.json,
+    and 'id'.
+    """
+    folder = Path(config.DOWNLOAD_DATA_PATH)
+    logging.info(f"Starting preprocessing in {folder}")
+
+    parquet_files = list(folder.glob("*nindexer*.parquet"))
+    if not parquet_files:
+        logging.warning(f"No parquet files found in {folder}")
+        return
+
+    for file_path_str in parquet_files:
+        input_path = Path(file_path_str)
+        if not input_path.exists():
+            print(f"File not found: {input_path}")
+            continue
+
+        try:
+            pf = pq.ParquetFile(input_path)
+            schema = pf.schema_arrow
+
+            # Determine columns to drop
+            cols_to_drop = [
+                field.name
+                for field in schema
+                if str(field.type) in ["extension<arrow.uuid>", "extension<arrow.json>"]
+                or field.name == "id"
+            ]
+
+            cols_to_keep = [name for name in schema.names if name not in cols_to_drop]
+
+            if not cols_to_drop:
+                print(f"No columns to drop for {input_path.name}")
+                continue
+
+            print(f"Processing {input_path.name}")
+            print(f" Dropping columns: {cols_to_drop}")
+            print(f" Keeping columns: {cols_to_keep}")
+
+            # Create new output path by incrementing the last number in the filename
+            stem_parts = input_path.stem.split("-")
+            if stem_parts[-1].isdigit():
+                new_timestamp = str(int(stem_parts[-1]) + 1)
+                stem_parts[-1] = new_timestamp
+            else:
+                new_timestamp = "1"  # fallback if not numeric
+                stem_parts.append(new_timestamp)
+
+            new_file_name = "-".join(stem_parts) + ".parquet"
+            output_path = input_path.parent / new_file_name
+
+            # Create writer using the new schema
+            new_schema = pa.schema([f for f in schema if f.name in cols_to_keep])
+            with pq.ParquetWriter(output_path, new_schema) as writer:
+                for rg in range(pf.num_row_groups):
+                    table = pf.read_row_group(rg, columns=cols_to_keep)
+                    writer.write_table(table)
+
+            print(f"Created cleaned file: {output_path.name}")
+
+        except Exception as e:
+            print(f"Error processing {input_path}: {e}")
+
 
 async def run_sybilscar():
     """Function to execute SybilSCAR pipeline."""
@@ -70,8 +138,8 @@ def remove_files_from_folder(folder_path:str):
             os.remove(file_path)
             print(f"Removed old file {file_path}")
 
-def remove_old_files():
-    folder_paths = [config.DATA_PATH, config.CHECKPOINTS_PATH]
+async def remove_old_files():
+    folder_paths = [config.DOWNLOAD_DATA_PATH, config.CHECKPOINTS_PATH]
     for folder in folder_paths:
         remove_files_from_folder(folder)
 
@@ -102,7 +170,7 @@ async def build_ml_model_feature_matrix(detector):
         )
 
     # Retrain model
-    labels_df = pl.read_parquet(f"{config.MODELS_PATH}/labels.parquet")
+    labels_df = pl.read_parquet(os.path.normpath(os.path.join(config.PERSISTED_DATA_PATH, "labels.parquet")))
     detector.trainer.train(labels_df)
 
 
@@ -114,7 +182,7 @@ detector_config = Config(
 
 def get_latest_file_pattern(name:str)->str:
     file_pattern = f"{name}-*.parquet"
-    parquet_files = glob.glob(os.path.join(config.DATA_PATH, file_pattern))
+    parquet_files = glob.glob(os.path.join(config.DOWNLOAD_DATA_PATH, file_pattern))
     if not parquet_files:
         raise FileNotFoundError(f"No files found matching pattern: {file_pattern}")
     parquet_files.sort()
@@ -149,7 +217,6 @@ async def post_outputs_to_db(
         db_batch_size: Batch size for database operations
         db_super_batch_size: Super batch size for database operations
     """
-    
     # Process checkpoints
     checkpoints_fids = []
     for file in os.listdir(config.CHECKPOINTS_PATH):
@@ -186,9 +253,9 @@ async def post_outputs_to_db(
     results = results.join(last_fnames, how="left", on="fid", coalesce=True)
     
     # Process SybilScar results
-    sybilscar_results = pl.read_parquet(f"{config.DATA_PATH}/interim/sybil_scar_results.parquet")
+    sybilscar_results = pl.read_parquet(f"{config.DATA_PATH}/raw/sybil_scar_results.parquet")
     sybilscar_results = sybilscar_results.with_columns(
-        (np.ones(len(sybilscar_results)) - pl.col("posterior")).alias("sybilscar_proba")
+        (1.0 - pl.col("posterior")).alias("sybilscar_proba")
     )
     
     # Combine all results
@@ -209,7 +276,7 @@ async def post_outputs_to_db(
             .then(pl.col('sybilscar_proba'))
             .when(pl.col('sybilscar_proba').is_null())
             .then(pl.col('ml_proba'))
-            .otherwise((pl.col('sybilscar_proba') + pl.col('ml_proba')) / 2)
+            .otherwise(pl.min_horizontal([pl.col('sybilscar_proba'), pl.col('ml_proba')]))
             .alias('sybil_probability')
     )
     
@@ -304,18 +371,11 @@ detector = DetectorService(detector_config, registry)
 
 async def main_routine():
     try:
-        if os.path.exists(f"{config.CHECKPOINTS_PATH}/checkpoint.json"):
-            with open(f"{config.CHECKPOINTS_PATH}/checkpoint.json", "r") as f:
-                last_time_processed = json.load(f)["last_timestamp"]
-            current_timestamp = round(time.time())
-            six_days = 60 * 60 * 24 * 6  # Almost job rerun time
-            if current_timestamp < last_time_processed + six_days:
-                return
-
-        # await remove_old_files()
-        # await sync_lbp_data()
-        # await run_sybilscar()
-        # await build_ml_model_feature_matrix(detector)
+        await remove_old_files()
+        await sync_lbp_data()
+        await preprocess_data() # Here is the new step
+        await run_sybilscar()
+        await build_ml_model_feature_matrix(detector)
         await post_outputs_to_db()
 
         # Log last time processed

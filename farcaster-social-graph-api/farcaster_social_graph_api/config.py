@@ -8,7 +8,7 @@ class Config:
     S3_FARCASTER_PARQUET_BUCKET_NAME = os.getenv("S3_FARCASTER_PARQUET_BUCKET_NAME")
 
     BASE_PATH = os.path.dirname(os.path.abspath(__file__))
-    DATA_PATH = os.path.join(BASE_PATH, "../../data")
+    DATA_PATH = os.path.normpath(os.path.join(BASE_PATH, "../../data/"))
     DOWNLOAD_DATA_PATH = os.path.join(DATA_PATH, "raw")
     PERSISTED_DATA_PATH = os.path.join(BASE_PATH, "persisted_data")
     CHECKPOINTS_PATH = os.path.join(DATA_PATH, "checkpoints")
@@ -39,7 +39,7 @@ class Config:
         "public-postgres/farcaster/v2/full/farcaster-warpcast_power_users-",
         "public-postgres/nindexer/v3/1/full/nindexer-follow_counts-",
         "public-postgres/nindexer/v3/1/full/nindexer-follows-",
-        "public-postgres/nindexer/v3/1/full/nindexer-neynar_user_scores-",
+        # "public-postgres/nindexer/v3/1/full/nindexer-neynar_user_scores-",
         "public-postgres/nindexer/v3/1/full/nindexer-profiles-",
         "public-postgres/nindexer/v3/1/full/nindexer-verifications-",
     ]

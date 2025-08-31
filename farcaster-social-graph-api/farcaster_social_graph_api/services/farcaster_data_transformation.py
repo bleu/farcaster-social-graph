@@ -134,9 +134,8 @@ class FarcasterUndirectedLinksBuilder(FarcasterBaseProcessor):
         # mutual_links_with_index_concatenated = mutual_links_with_index_concatenated.with_columns(
         #     (pl.col("fid_index").cast(pl.Utf8) + " " + pl.col("target_fid_index").cast(pl.Utf8)).alias("connection")
         # )
-
         labels_df = pl.scan_parquet(
-            f"/{self.persisted_data_path}/labels.parquet"
+            f"{self.persisted_data_path}/sybilscar_labels.parquet"
         )
 
         return mutual_links_with_index_concatenated.join(
